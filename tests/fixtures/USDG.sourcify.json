@@ -1,0 +1,2037 @@
+{
+ "source": "https://sourcify.dev/server/v2/contract/4663/<address>?fields=abi,compilation",
+ "retrieved": "2026-11-11",
+ "chainId": 4663,
+ "address": "0x68184C449E1a8f34fA18d289737129FD27B66f8F",
+ "proxy": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+ "contract": "USDG (implementation behind an ERC-1967 proxy)",
+ "compiler": "0.8.28+commit.7893614a",
+ "sourcifyMatch": "match",
+ "abi": [
+  {
+   "name": "AccessControlUnauthorizedAccount",
+   "type": "error",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address"
+    },
+    {
+     "name": "role",
+     "type": "bytes32"
+    }
+   ]
+  },
+  {
+   "name": "AddressFrozen",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "AddressNotFrozen",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "AlreadyPaused",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "AlreadyRegistered",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "AlreadyUnPaused",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ArgumentLengthMismatch",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "BadDestination",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "BalanceOverflow",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ClaimSourceCannotBeRegistered",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ClaimSourceNotSet",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ContractCannotBeRegistered",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ContractPaused",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "FacetNotFound",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InactivePayoutGroup",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InsufficientAllowance",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InsufficientClaimSourceBalance",
+   "type": "error",
+   "inputs": [
+    {
+     "name": "required",
+     "type": "uint256"
+    },
+    {
+     "name": "available",
+     "type": "uint256"
+    }
+   ]
+  },
+  {
+   "name": "InsufficientFunds",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InvalidAccount",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InvalidClaimer",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InvalidPermission",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InvalidRateBounds",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "InvalidSignature",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "MultiplierIndexNotFound",
+   "type": "error",
+   "inputs": [
+    {
+     "name": "index",
+     "type": "uint32"
+    }
+   ]
+  },
+  {
+   "name": "NoRegistrationProposal",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "NotAccountClaimer",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "NotProposer",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "NotRegistered",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "OnlySupplyController",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "OnlySupplyControllerOrOwner",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "PayoutGroupMismatch",
+   "type": "error",
+   "inputs": [
+    {
+     "name": "expected",
+     "type": "uint32"
+    },
+    {
+     "name": "actual",
+     "type": "uint32"
+    }
+   ]
+  },
+  {
+   "name": "PayoutGroupNotFound",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "RateOverflow",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "RewardPeriodOverflow",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "SharesOverflow",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "SupplyControllerUnchanged",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "TotalBalanceOverflow",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ZeroAddress",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ZeroMultiplier",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "ZeroValue",
+   "type": "error",
+   "inputs": []
+  },
+  {
+   "name": "AccountDeregistered",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "claimer",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "AccountRegistered",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "claimer",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "AdminChanged",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "previousAdmin",
+     "type": "address",
+     "indexed": false
+    },
+    {
+     "name": "newAdmin",
+     "type": "address",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "Approval",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "owner",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "spender",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "value",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "BeaconUpgraded",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "beacon",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ClaimAllExecuted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "executor",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "destination",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ClaimSourceSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "oldSource",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "newSource",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "DefaultAdminDelayChangeCanceled",
+   "type": "event",
+   "inputs": [],
+   "anonymous": false
+  },
+  {
+   "name": "DefaultAdminDelayChangeScheduled",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "newDelay",
+     "type": "uint48",
+     "indexed": false
+    },
+    {
+     "name": "effectSchedule",
+     "type": "uint48",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "DefaultAdminTransferCanceled",
+   "type": "event",
+   "inputs": [],
+   "anonymous": false
+  },
+  {
+   "name": "DefaultAdminTransferScheduled",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "newAdmin",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "acceptSchedule",
+     "type": "uint48",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "FacetUpdate",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "selector",
+     "type": "bytes4",
+     "indexed": true
+    },
+    {
+     "name": "facet",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "FreezeAddress",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "addr",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "FrozenAddressWiped",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "addr",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "FrozenRewardsLost",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "addr",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "rewards",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "Initialized",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "version",
+     "type": "uint8",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "MaturityPeriodSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "multiplierId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "maturityPeriod",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "MultiplierCreated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "multiplierId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "apr",
+     "type": "uint256",
+     "indexed": false
+    },
+    {
+     "name": "timestamp",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "MultiplierDeleted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "multiplierId",
+     "type": "uint32",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "MultiplierRateScheduled",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "multiplierId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "newRate",
+     "type": "uint256",
+     "indexed": false
+    },
+    {
+     "name": "scheduledTime",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PartnerSignedRegistrationsEnabledSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "enabled",
+     "type": "bool",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "Pause",
+   "type": "event",
+   "inputs": [],
+   "anonymous": false
+  },
+  {
+   "name": "PayoutClaimerUpdated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "oldClaimer",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "newClaimer",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PayoutGroupCreated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "claimer",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "multiplierId",
+     "type": "uint32",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PayoutGroupDeleted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "claimer",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PayoutGroupDestinationSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "oldDestination",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "newDestination",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PayoutGroupManagerSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "oldManager",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "newManager",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PayoutGroupMultiplierUpdated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "claimer",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "oldMultiplierId",
+     "type": "uint32",
+     "indexed": false
+    },
+    {
+     "name": "newMultiplierId",
+     "type": "uint32",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RateBoundsSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "minRate",
+     "type": "uint256",
+     "indexed": false
+    },
+    {
+     "name": "maxRate",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ReferenceTimeUpdated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "oldReferenceTime",
+     "type": "uint40",
+     "indexed": false
+    },
+    {
+     "name": "newReferenceTime",
+     "type": "uint40",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RegistrationAccepted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RegistrationProposalCancelled",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "proposer",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RegistrationProposed",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "proposer",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RewardsClaimed",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "recipient",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RewardsClaimedBatch",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "executor",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "destination",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "totalAmount",
+     "type": "uint256",
+     "indexed": false
+    },
+    {
+     "name": "accountCount",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RewardsFrozen",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "addr",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "payoutGroupId",
+     "type": "uint32",
+     "indexed": true
+    },
+    {
+     "name": "rewards",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RoleAdminChanged",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32",
+     "indexed": true
+    },
+    {
+     "name": "previousAdminRole",
+     "type": "bytes32",
+     "indexed": true
+    },
+    {
+     "name": "newAdminRole",
+     "type": "bytes32",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RoleGranted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32",
+     "indexed": true
+    },
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "sender",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "RoleRevoked",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32",
+     "indexed": true
+    },
+    {
+     "name": "account",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "sender",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "SupplyControlSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "supplyControlAddress",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "SupplyDecreased",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "from",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "value",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "SupplyIncreased",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "to",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "value",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "Transfer",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "from",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "to",
+     "type": "address",
+     "indexed": true
+    },
+    {
+     "name": "value",
+     "type": "uint256",
+     "indexed": false
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "UnfreezeAddress",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "addr",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "Unpause",
+   "type": "event",
+   "inputs": [],
+   "anonymous": false
+  },
+  {
+   "name": "Upgraded",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "implementation",
+     "type": "address",
+     "indexed": true
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "type": "fallback",
+   "stateMutability": "payable"
+  },
+  {
+   "name": "DEFAULT_ADMIN_ROLE",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bytes32"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "DOMAIN_SEPARATOR",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bytes32"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "EIP712_DOMAIN_HASH_DEPRECATED",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bytes32"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "EIP712_VERSION_PREFIX",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bytes2"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "acceptDefaultAdminTransfer",
+   "type": "function",
+   "inputs": [],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "allowance",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "owner",
+     "type": "address"
+    },
+    {
+     "name": "spender",
+     "type": "address"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "uint256"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "approve",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "spender",
+     "type": "address"
+    },
+    {
+     "name": "value",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "assetProtectionRoleDeprecated",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "balanceOf",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "addr",
+     "type": "address"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "uint256"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "batchSetFacet",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "facetCuts",
+     "type": "tuple[]",
+     "components": [
+      {
+       "name": "facet",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "selectors",
+       "type": "bytes4[]",
+       "internalType": "bytes4[]"
+      }
+     ]
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "beginDefaultAdminTransfer",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "newAdmin",
+     "type": "address"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "betaDelegateWhitelisterDeprecated",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "burn",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "amount",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "cancelDefaultAdminTransfer",
+   "type": "function",
+   "inputs": [],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "changeDefaultAdminDelay",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "newDelay",
+     "type": "uint48"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "decimals",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "uint8"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "decreaseApproval",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "spender",
+     "type": "address"
+    },
+    {
+     "name": "subtractedValue",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "decreaseSupply",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "value",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "success",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "decreaseSupplyFromAddress",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "value",
+     "type": "uint256"
+    },
+    {
+     "name": "burnFromAddress",
+     "type": "address"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "success",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "defaultAdmin",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "defaultAdminDelay",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "uint48"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "defaultAdminDelayIncreaseWait",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "uint48"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "facets",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "",
+     "type": "bytes4"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "getFacet",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "selector",
+     "type": "bytes4"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "getRoleAdmin",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bytes32"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "globalTransferSettings",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "referenceTime",
+     "type": "uint40"
+    },
+    {
+     "name": "maturityPeriod",
+     "type": "uint32"
+    },
+    {
+     "name": "partnerSignedRegistrationsEnabled",
+     "type": "bool"
+    },
+    {
+     "name": "__gap_remaining",
+     "type": "bytes10"
+    },
+    {
+     "name": "paused",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "grantRole",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32"
+    },
+    {
+     "name": "account",
+     "type": "address"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "hasRole",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32"
+    },
+    {
+     "name": "account",
+     "type": "address"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "increaseApproval",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "spender",
+     "type": "address"
+    },
+    {
+     "name": "addedValue",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "increaseSupply",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "value",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "success",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "increaseSupplyToAddress",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "value",
+     "type": "uint256"
+    },
+    {
+     "name": "mintToAddress",
+     "type": "address"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "success",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "initialize",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "initialDelay",
+     "type": "uint48"
+    },
+    {
+     "name": "initialOwner",
+     "type": "address"
+    },
+    {
+     "name": "pauser",
+     "type": "address"
+    },
+    {
+     "name": "assetProtector",
+     "type": "address"
+    },
+    {
+     "name": "facetCuts",
+     "type": "tuple[]",
+     "components": [
+      {
+       "name": "facet",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "selectors",
+       "type": "bytes4[]",
+       "internalType": "bytes4[]"
+      }
+     ]
+    },
+    {
+     "name": "claimSource",
+     "type": "address"
+    },
+    {
+     "name": "minRate",
+     "type": "uint256"
+    },
+    {
+     "name": "maxRate",
+     "type": "uint256"
+    },
+    {
+     "name": "v3Roles",
+     "type": "tuple",
+     "components": [
+      {
+       "name": "multAdmin",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "multRateAdmin",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "payoutGroupAdmin",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "payoutGroupRegistrar",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "claimOperator",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "claimAdmin",
+       "type": "address",
+       "internalType": "address"
+      }
+     ]
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "initializeV3",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "facetCuts",
+     "type": "tuple[]",
+     "components": [
+      {
+       "name": "facet",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "selectors",
+       "type": "bytes4[]",
+       "internalType": "bytes4[]"
+      }
+     ]
+    },
+    {
+     "name": "claimSource",
+     "type": "address"
+    },
+    {
+     "name": "minRate",
+     "type": "uint256"
+    },
+    {
+     "name": "maxRate",
+     "type": "uint256"
+    },
+    {
+     "name": "v3Roles",
+     "type": "tuple",
+     "components": [
+      {
+       "name": "multAdmin",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "multRateAdmin",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "payoutGroupAdmin",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "payoutGroupRegistrar",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "claimOperator",
+       "type": "address",
+       "internalType": "address"
+      },
+      {
+       "name": "claimAdmin",
+       "type": "address",
+       "internalType": "address"
+      }
+     ]
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "mint",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "account",
+     "type": "address"
+    },
+    {
+     "name": "amount",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "name",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "string"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "owner",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "pendingDefaultAdmin",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "newAdmin",
+     "type": "address"
+    },
+    {
+     "name": "schedule",
+     "type": "uint48"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "pendingDefaultAdminDelay",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "newDelay",
+     "type": "uint48"
+    },
+    {
+     "name": "schedule",
+     "type": "uint48"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "proposedOwnerDeprecated",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "proxiableUUID",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bytes32"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "renounceRole",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32"
+    },
+    {
+     "name": "account",
+     "type": "address"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "revokeRole",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "role",
+     "type": "bytes32"
+    },
+    {
+     "name": "account",
+     "type": "address"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "rollbackDefaultAdminDelay",
+   "type": "function",
+   "inputs": [],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "setFacet",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "selector",
+     "type": "bytes4"
+    },
+    {
+     "name": "facetAddress",
+     "type": "address"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "supplyControl",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "supplyControllerDeprecated",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "supportsInterface",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "interfaceId",
+     "type": "bytes4"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "symbol",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "string"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "totalSupply",
+   "type": "function",
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "",
+     "type": "uint256"
+    }
+   ],
+   "stateMutability": "view"
+  },
+  {
+   "name": "transfer",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "to",
+     "type": "address"
+    },
+    {
+     "name": "value",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "transferFrom",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "from",
+     "type": "address"
+    },
+    {
+     "name": "to",
+     "type": "address"
+    },
+    {
+     "name": "value",
+     "type": "uint256"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "transferFromBatch",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "from",
+     "type": "address[]"
+    },
+    {
+     "name": "to",
+     "type": "address[]"
+    },
+    {
+     "name": "value",
+     "type": "uint256[]"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "upgradeTo",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "newImplementation",
+     "type": "address"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "nonpayable"
+  },
+  {
+   "name": "upgradeToAndCall",
+   "type": "function",
+   "inputs": [
+    {
+     "name": "newImplementation",
+     "type": "address"
+    },
+    {
+     "name": "data",
+     "type": "bytes"
+    }
+   ],
+   "outputs": [],
+   "stateMutability": "payable"
+  },
+  {
+   "type": "receive",
+   "stateMutability": "payable"
+  }
+ ]
+}

@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------------------------------
+   VATE — "Bright Orbital" design tokens.
+   Source: VATE_TECHNICAL_SPEC §8A. One deliberate change: --text-muted is #5A7177 instead of
+   #667C82, because the specified value measures 4.40:1 on white and 4.19:1 on the page
+   background, below the 4.5:1 the brief requires (see tests/unit/contrast.test.ts).
+   ------------------------------------------------------------------------------------------ */
+:root {
+  --bg: #f7faf9;
+  --surface: #ffffff;
+  --surface-muted: #edf5f3;
+  --text-primary: #142d35;
+  --text-secondary: #526970;
+  --text-muted: #5a7177;
+  --border: #d8e5e2;
+  --border-strong: #b4c8c4;
+  --accent: #087f75;
+  --accent-hover: #06665f;
+  --accent-soft: #ddf6ec;
+  --accent-secondary: #2487d8;
+  --sky-soft: #e5f2fd;
+  --success: #137a56;
+  --warning: #986300;
+  --error: #c13c4b;
+
+  /* derived */
+  --ink-rgb: 20, 45, 53;
+  --accent-rgb: 8, 127, 117;
+  --sky-rgb: 36, 135, 216;
+  --error-rgb: 193, 60, 75;
+  --warning-rgb: 152, 99, 0;
+  --shadow-sm: 0 1px 2px rgba(var(--ink-rgb), 0.05), 0 4px 14px rgba(var(--ink-rgb), 0.05);
+  --shadow-lg: 0 18px 50px rgba(var(--ink-rgb), 0.16);
+
+  --f-d: var(--font-archivo), "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-s: var(--font-instrument), "Instrument Serif", Georgia, "Times New Roman", serif;
+  --f-m: var(--font-jetbrains), "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --ease: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --r: 14px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-3: var(--text-muted);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-sky: var(--accent-secondary);
+  --color-sky-soft: var(--sky-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --font-display: var(--f-d);
+  --font-serif: var(--f-s);
+  --font-mono: var(--f-m);
+}
+
+html {
+  background: var(--bg);
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  /* Transparent on purpose: the fixed decorative layers sit at negative z-index, above the
+     root background and below the content. A body background would paint over them. */
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--f-d);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+[hidden] {
+  display: none !important;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.mono {
+  font-family: var(--f-m);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Decorative layers shared by every page. Very light on purpose: a clean ivory, not a dirty one. */
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background:
+    radial-gradient(60vw 40vw at 85% 0%, rgba(var(--sky-rgb), 0.1), transparent 60%),
+    radial-gradient(40vw 40vw at 0% 100%, rgba(var(--accent-rgb), 0.07), transparent 60%),
+    var(--bg);
+}
+.grain {
+  position: fixed;
+  left: -50%;
+  top: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.18  0 0 0 0 0.21  0 0 0 1.3 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: vate-grain 0.9s steps(6) infinite;
+}
+@keyframes vate-grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3%, 2%); }
+  50% { transform: translate(2%, -3%); }
+  75% { transform: translate(-2%, -1%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes vate-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes vate-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+@keyframes vate-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes vate-shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* Token contract widget (hero, footers, docs). Shows "Contract pending" until VATE has one. */
+.ca {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  font: 500 12px/1 var(--f-m);
+  color: var(--text-primary);
+  transition: border-color 0.3s;
+}
+.ca:hover {
+  border-color: rgba(var(--accent-rgb), 0.55);
+}
+.ca-tag {
+  flex: none;
+  color: var(--accent-hover);
+  letter-spacing: 0.1em;
+}
+.ca-addr {
+  min-width: 0;
+  max-width: min(46vw, 380px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+.ca-addr.pending {
+  color: var(--text-secondary);
+}
+.ca-copy {
+  flex: none;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 10.5px/1 var(--f-m);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.2s;
+}
+.ca-copy:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--accent-hover);
+}
+.ca-copy.ok {
+  background: var(--text-primary);
+}
+.ca-copy:disabled,
+.ca-link[aria-disabled="true"] {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.ca-link {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  transition: all 0.3s;
+}
+.ca-link:not([aria-disabled="true"]):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

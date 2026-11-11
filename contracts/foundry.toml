@@ -1,0 +1,13 @@
+# VATE testnet contracts — test doubles for Robinhood Chain Testnet (46630).
+# The creation code is committed to src/config/testnet-fixture.initcode.json so addresses stay deterministic.
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+cache_path = "cache"
+solc_version = "0.8.28"
+evm_version = "paris"          # no PUSH0/MCOPY: safe on every Arbitrum Orbit ArbOS version
+optimizer = true
+optimizer_runs = 200
+bytecode_hash = "none"         # path-independent bytecode => reproducible CREATE2 address
+cbor_metadata = false
