@@ -3,8 +3,9 @@
 //   1. forks Robinhood Chain Testnet locally with Anvil and deploys a fresh copy of the VATE test fixture,
 //   2. builds and serves the app pointed at that fork (separate build dir: .next-e2e),
 //   3. injects an EIP-6963 test wallet backed by an Anvil dev account,
-//   4. walks through connect, faucet, deposit, rejection, portfolio, partial withdraw, MAX,
-//      the no-adapter liquidity cap, wrong network, reload/reconnect and disconnect,
+//   4. walks through connect, faucet, deposit, rejection, portfolio, the share card, partial
+//      withdraw, MAX, the no-adapter liquidity cap, wrong network, the phone layout,
+//      reload/reconnect and disconnect,
 //   5. checks the landing page's music (starts with the first interaction; the sound button
 //      switches it off and on and is remembered) and its pointer lens.
 // Requires Foundry (anvil) and Playwright's Chromium (pnpm exec playwright install chromium).   pnpm test:e2e
@@ -239,6 +240,58 @@ async function main() {
   await page.locator('table.t tbody tr td b', { hasText: 'VATE Test Vault I' }).waitFor({ timeout: 15_000 });
   check('after a reload the approved session is restored silently and activity persists', /↓ Deposit/.test(await text('[aria-label="Transactions from this app"] tbody')));
 
+  // share card: opened from the position, shaped by the options, remembered, closed
+  const shareBtn = page.locator('table.t button', { hasText: 'Share' });
+  const card = page.locator('.va-modal .scard');
+  const cardStats = () => page.locator('.va-modal .sc-stats > div').evaluateAll((els) => els.map((e) => e.dataset.stat).join(','));
+  const cardPrefs = () => page.evaluate(() => localStorage.getItem('vate-card-v1'));
+  await shareBtn.click();
+  await card.waitFor({ timeout: 10_000 });
+  check('share card opens from the position with the vault, the APY and the tracked figures',
+    (await text('.va-modal .sc-name')) === 'VATE Test Vault I' && (await text('.va-modal .sc-label')) === 'Current APY' && /^\d+\.\d\d%$/.test(await text('.va-modal .sc-value'))
+      && (await cardStats()) === 'deposited,value,profit,held' && (await text('.va-modal [data-stat="deposited"] b')) === '1,000.00tUSDG' && (await cardPrefs()) === null,
+    `${await text('.va-modal .sc-label')} ${await text('.va-modal .sc-value')} | ${await cardStats()} | held ${await text('.va-modal [data-stat="held"] b')}`);
+  // read in one go, so a refresh between two reads cannot make them differ
+  const profits = await page.evaluate(() => ({
+    row: document.querySelector('table.t tbody tr td:nth-child(4)')?.textContent?.trim() ?? '',
+    card: document.querySelector('.va-modal [data-stat="profit"] b')?.firstChild?.textContent?.trim() ?? '',
+  }));
+  check('share card: the profit on the card is the figure in the portfolio row', profits.row !== '' && profits.row === profits.card, `row ${profits.row} | card ${profits.card}`);
+  check('share card on testnet says so and shows no dollar amounts', /Testnet · no real value/.test(await text('.va-modal .sc-brand')) && !/\$/.test((await card.textContent()) ?? ''), await text('.va-modal .sc-brand small'));
+  await shot('05b-share-card');
+  await page.getByRole('radio', { name: 'Return in percent' }).check();
+  const pctHead = `${await text('.va-modal .sc-label')} ${await text('.va-modal .sc-value')}`;
+  check('share card: the headline can be the tracked return in percent', /^Return ([+−]\d+\.\d{2,4}%|0\.00%)$/.test(pctHead) && (await cardStats()) === 'deposited,value,apy,held', `${pctHead} | ${await cardStats()}`);
+  await page.getByRole('switch', { name: 'Deposited & value' }).uncheck();
+  check('share card: amounts can be left off entirely', (await cardStats()) === 'apy,held' && !/tUSDG/.test((await card.textContent()) ?? ''), await cardStats());
+  await page.getByRole('radio', { name: 'Night' }).check();
+  await page.getByRole('radio', { name: 'Satellite', exact: true }).check();
+  await page.getByRole('switch', { name: 'Wallet address' }).check();
+  check('share card: style, drawing and the optional wallet address are applied',
+    /\bnight\b/.test((await card.getAttribute('class')) ?? '') && (await page.locator('.va-modal .sc-art').getAttribute('data-art')) === 'satellite' && (await text('.va-modal .sc-wallet')) === '0x7099…79C8',
+    `${await card.getAttribute('class')} | ${await text('.va-modal .sc-sub')}`);
+  await shot('05c-share-card-night');
+  await page.keyboard.press('Escape');
+  await page.locator('.va-modal').waitFor({ state: 'detached' });
+  check('share card: Escape closes it and focus returns to the Share button', await shareBtn.evaluate((el) => el === document.activeElement));
+  await shareBtn.click();
+  await card.waitFor();
+  check('share card: the choices are remembered in this browser',
+    /\bnight\b/.test((await card.getAttribute('class')) ?? '') && (await text('.va-modal .sc-label')) === 'Return' && (await cardStats()) === 'apy,held' && /"style":"night"/.test((await cardPrefs()) ?? ''), (await cardPrefs()) ?? 'nothing stored');
+  await page.locator('.va-modal .sc-reset').click();
+  check('share card: Reset restores the defaults and forgets the choices',
+    /\bbright\b/.test((await card.getAttribute('class')) ?? '') && (await text('.va-modal .sc-label')) === 'Current APY' && (await cardStats()) === 'deposited,value,profit,held' && (await cardPrefs()) === null, await cardStats());
+  await page.locator('.va-modal .sc-bar .btn', { hasText: 'Done' }).click();
+  await page.locator('.va-modal').waitFor({ state: 'detached' });
+
+  // a window taller than the page: the footer stays on the bottom edge instead of floating under the content
+  await page.setViewportSize({ width: 1600, height: 1500 });
+  await page.waitForTimeout(400);
+  const tall = await page.evaluate(() => ({ page: document.documentElement.scrollHeight, win: innerHeight, footer: Math.round(document.querySelector('.va-footer').getBoundingClientRect().bottom) }));
+  check('on a window taller than the page the footer sits on the bottom edge', tall.page === tall.win && tall.footer === tall.win, JSON.stringify(tall));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(400);
+
   // partial withdraw from the portfolio row
   await page.locator('table.t button', { hasText: 'Withdraw' }).click();
   await page.locator('.seg button[aria-selected="true"]', { hasText: 'Withdraw' }).waitFor();
@@ -298,6 +351,22 @@ async function main() {
   const order = await page.evaluate(() => { const a = document.querySelector('.act').getBoundingClientRect().top; const v = document.querySelector('.vlist').getBoundingClientRect().top; return a < v; });
   check('390 px: no horizontal page scroll, transaction panel comes first', overflow <= 1 && order, `overflow ${overflow}px`);
   await shot('09-mobile-connected');
+  // the portfolio at the same width: each position is laid out as a card
+  await page.locator('.tabs button', { hasText: 'Portfolio' }).click();
+  await page.locator('table.pos tbody tr td b').first().waitFor({ timeout: 15_000 });
+  const stacked = await page.evaluate(() => {
+    const wrap = document.querySelector('table.pos').parentElement;
+    const buttons = [...document.querySelectorAll('table.pos .acts .btn')].map((b) => b.getBoundingClientRect());
+    return {
+      sideways: wrap.scrollWidth - wrap.clientWidth,
+      buttonsOnScreen: buttons.length === 2 && buttons.every((r) => r.left >= 0 && r.right <= innerWidth && r.height >= 44),
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  check('390 px: a position is a card with Share and Withdraw on screen, nothing scrolls sideways', stacked.sideways <= 1 && stacked.buttonsOnScreen && stacked.pageOverflow <= 1, JSON.stringify(stacked));
+  await shot('09b-mobile-portfolio');
+  await page.locator('.tabs button', { hasText: 'Vaults' }).click();
+  await page.locator('.vault .pick').waitFor({ timeout: 15_000 });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   // account menu + disconnect
