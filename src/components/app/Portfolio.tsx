@@ -1,14 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import type { Address } from 'viem';
 import { explorerAddress, explorerTx, findVault, NETWORK } from '@/config/networks';
 import type { WalletSnapshot } from '@/lib/chain/reads';
 import { fmtDateTime, fmtPct, fmtUsd, shortAddress } from '@/lib/format';
 import { summarizePortfolio } from '@/lib/portfolio';
+import { positionOpenedAt, type CardSubject } from '@/lib/share-card';
 import { trackedProfit, type TxStore } from '@/lib/storage';
 import type { ActivityRecord, PendingRecord, Ranking } from '@/lib/types';
 import { formatAmount } from '@/lib/units';
-import { OrbitIcon, Unknown } from './ui';
+import { ShareCardModal } from './ShareCard';
+import { OrbitIcon, ShareIcon, Unknown } from './ui';
 
 const SYMBOL = NETWORK.asset.symbol;
 const DECIMALS = NETWORK.asset.decimals;
@@ -49,10 +52,33 @@ export function PortfolioView({
     : [];
   const summary = summarizePortfolio(rows.map((x) => ({ assets: x.state!.assets, apy: x.v.market.apy })), DECIMALS);
   const ready = account != null && wallet != null;
+  // The position whose share card is open. It closes by itself if the position is gone.
+  const [shareFor, setShareFor] = useState<Address | null>(null);
+  const shared = shareFor ? rows.find((x) => x.v.market.address === shareFor) : undefined;
+  let card: CardSubject | null = null;
+  if (shared?.state && account) {
+    const { v, state } = shared;
+    const ledger = store?.ledger(v.market.address) ?? null;
+    card = {
+      vaultName: v.market.name,
+      networkLabel: NETWORK.label,
+      symbol: SYMBOL,
+      decimals: DECIMALS,
+      isTestnet: NETWORK.isTestnet,
+      isPick: ranking.pick?.market.address === v.market.address,
+      apy: v.market.apy,
+      assets: state.assets,
+      profit: trackedProfit(ledger, state.shares, state.assets),
+      ledger,
+      openedAt: positionOpenedAt(ledger, activity, v.market.address),
+      account,
+      history: v.market.history,
+    };
+  }
   const nameOf = (address: string) => ranking.all.find((v) => v.market.address.toLowerCase() === address.toLowerCase())?.market.name ?? findVault(NETWORK, address)?.name ?? shortAddress(address);
 
   return (
-    <section className="view" aria-labelledby="pf-title">
+    <section className="view pf" aria-labelledby="pf-title">
       <h1 className="title" id="pf-title">Your <em>portfolio</em></h1>
       <p className="sub">
         Read directly from the vault contracts for your connected address. Profit is calculated from deposits and withdrawals made in
@@ -78,35 +104,37 @@ export function PortfolioView({
         </div>
       </div>
 
+      {/* On narrow windows each position is laid out as a small card (app.css). Changing `display`
+          drops a table's built-in semantics in some browsers, so the roles are spelled out. */}
       <div className="card tbl-wrap" role="region" aria-label="Positions" tabIndex={0}>
-        <table className="t">
-          <thead>
-            <tr>
-              <th className="label" scope="col">Vault</th>
-              <th className="label" scope="col">Shares</th>
-              <th className="label" scope="col">Value (<span className="sym">{SYMBOL}</span>)</th>
-              <th className="label" scope="col">Profit (tracked)</th>
-              <th className="label" scope="col">APY</th>
-              <th className="label r" scope="col">Action</th>
+        <table className="t pos" role="table">
+          <thead role="rowgroup">
+            <tr role="row">
+              <th className="label" scope="col" role="columnheader">Vault</th>
+              <th className="label" scope="col" role="columnheader">Shares</th>
+              <th className="label" scope="col" role="columnheader">Value (<span className="sym">{SYMBOL}</span>)</th>
+              <th className="label" scope="col" role="columnheader">Profit (tracked)</th>
+              <th className="label" scope="col" role="columnheader">APY</th>
+              <th className="label r" scope="col" role="columnheader">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {!account ? (
-              <tr><td colSpan={6}><div className="empty">
+              <tr role="row"><td role="cell" colSpan={6}><div className="empty">
                 Connect your wallet to read your positions from the chain.
                 <br />
                 <button className="btn sm" type="button" onClick={onConnect}>Connect wallet</button>
               </div></td></tr>
             ) : walletError && !wallet ? (
-              <tr><td colSpan={6}><div className="empty">
+              <tr role="row"><td role="cell" colSpan={6}><div className="empty">
                 Could not read your positions from the chain. Your funds are not affected; this is a connection problem.
                 <br />
                 <button className="btn sm" type="button" onClick={onRetry}>Try again</button>
               </div></td></tr>
             ) : !wallet || walletLoading && !wallet ? (
-              <tr><td colSpan={6}><div className="empty">Reading your positions from the chain…</div></td></tr>
+              <tr role="row"><td role="cell" colSpan={6}><div className="empty">Reading your positions from the chain…</div></td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6}><div className="empty">
+              <tr role="row"><td role="cell" colSpan={6}><div className="empty">
                 <OrbitIcon />
                 <div>
                   No vault shares found for {shortAddress(account)}{wallet.partial ? ' in the vaults that could be read' : ''}.
@@ -119,11 +147,11 @@ export function PortfolioView({
                 const s = state!;
                 const profit = trackedProfit(store?.ledger(v.market.address) ?? null, s.shares, s.assets);
                 return (
-                  <tr key={v.market.address}>
-                    <td><b>{v.market.name}</b><span className="label">{v.market.curator}</span></td>
-                    <td className="mono" style={{ fontSize: 12 }}>{formatAmount(s.shares, v.onchain?.shareDecimals ?? findVault(NETWORK, v.market.address)?.defaultShareDecimals ?? 18, 4)}</td>
-                    <td><b>{formatAmount(s.assets, DECIMALS)}</b></td>
-                    <td>
+                  <tr key={v.market.address} role="row">
+                    <td role="cell"><b>{v.market.name}</b><span className="label">{v.market.curator}</span></td>
+                    <td role="cell" data-label="SHARES" className="mono" style={{ fontSize: 12 }}>{formatAmount(s.shares, v.onchain?.shareDecimals ?? findVault(NETWORK, v.market.address)?.defaultShareDecimals ?? 18, 4)}</td>
+                    <td role="cell" data-label={`VALUE (${SYMBOL})`}><b>{formatAmount(s.assets, DECIMALS)}</b></td>
+                    <td role="cell" data-label="PROFIT (TRACKED)">
                       {profit.status === 'tracked' ? (
                         <ProfitCell value={profit.profit} />
                       ) : profit.status === 'incomplete' ? (
@@ -132,8 +160,15 @@ export function PortfolioView({
                         <span className="muted-t" title="This position was not opened through VATE in this browser, so its cost basis is not known here.">not tracked</span>
                       )}
                     </td>
-                    <td>{v.market.apy == null ? <Unknown /> : fmtPct(v.market.apy)}</td>
-                    <td className="r"><button className="btn sm" type="button" onClick={() => onWithdraw(v.market.address)}>Withdraw</button></td>
+                    <td role="cell" data-label="APY">{v.market.apy == null ? <Unknown /> : fmtPct(v.market.apy)}</td>
+                    <td role="cell" className="r">
+                      <span className="acts">
+                        <button className="btn sm quiet" type="button" onClick={() => setShareFor(v.market.address)} aria-label={`Share card for ${v.market.name}`}>
+                          <ShareIcon />Share
+                        </button>
+                        <button className="btn sm" type="button" onClick={() => onWithdraw(v.market.address)}>Withdraw</button>
+                      </span>
+                    </td>
                   </tr>
                 );
               })
@@ -210,6 +245,7 @@ export function PortfolioView({
           </tbody>
         </table>
       </div>
+      <ShareCardModal subject={card} onClose={() => setShareFor(null)} />
     </section>
   );
 }

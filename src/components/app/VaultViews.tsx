@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { Address } from 'viem';
 import { explorerAddress, findVault, NETWORK } from '@/config/networks';
 import { fmtAge, fmtClock, fmtCompactUsd, fmtDateTime, fmtPct, shortAddress } from '@/lib/format';
@@ -83,10 +83,16 @@ export function StatCards({
         <div className={`v block-n${block == null && !blockError ? ' sk' : ''}`}>
           {block != null ? `#${Number(block).toLocaleString('en-US')}` : blockError ? <Unknown /> : '000,000,000'}
         </div>
-        <div className={`d${blockError ? ' bad' : ''}`}>{blockError ? 'RPC offline · retrying' : `rpc · ${rpcHost ?? '—'}`}</div>
+        <div className={`d${blockError ? ' bad' : ''}`}>{blockError ? 'RPC offline · retrying' : <>rpc · {rpcHost ? <Host name={rpcHost} /> : '—'}</>}</div>
       </div>
     </div>
   );
+}
+
+/** A host name that may wrap after its dots, so a narrow card breaks it between labels and not inside one. */
+function Host({ name }: { name: string }) {
+  const parts = name.split('.');
+  return <>{parts.map((part, i) => <Fragment key={i}>{part}{i < parts.length - 1 ? <>.<wbr /></> : null}</Fragment>)}</>;
 }
 
 export function VaultList({
@@ -173,7 +179,7 @@ export function VaultDetail({
   const sourceName = m.apySource === 'defillama' ? 'DeFiLlama' : m.apySource === 'morpho' ? 'Morpho API (net APY)' : m.apySource === 'onchain' ? 'vault contract (simulated rate)' : null;
 
   return (
-    <div className="card">
+    <div className="card vdetail">
       <div className="card-b">
         <div className="vhead">
           <div>

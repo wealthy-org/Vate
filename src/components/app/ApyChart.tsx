@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerE
 import { fmtCompactUsd, fmtDate, fmtDateTime, fmtPct } from '@/lib/format';
 import type { ApyPoint } from '@/lib/types';
 
-const H = 220;
+/** Size assumed until the box has been measured (and on the server). */
+const BASE = { w: 600, h: 184 };
 const PAD = { l: 40, r: 10, t: 16, b: 26 };
 
 export type ChartRange = 7 | 30 | 0;
@@ -12,6 +13,8 @@ export type ChartRange = 7 | 30 | 0;
 /**
  * Single-series APY chart with a crosshair tooltip (date, total, base / rewards, TVL).
  * Works with mouse, touch and keyboard (focus the chart, then use the arrow keys).
+ * It is drawn 1:1 into whatever box the stylesheet gives it (`.chart-box`): the box is measured
+ * and the drawing follows, so a taller or wider box means a larger chart, never a scaled one.
  */
 export function ApyChart({
   history,
@@ -29,14 +32,18 @@ export function ApyChart({
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(600);
+  const [{ w: width, h: height }, setSize] = useState(BASE);
   const [active, setActive] = useState<number | null>(null);
   const [tipPos, setTipPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
 
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
-    const measure = () => setWidth(Math.max(240, el.clientWidth));
+    const measure = () => {
+      const w = Math.max(240, el.clientWidth);
+      const h = Math.max(120, el.clientHeight);
+      setSize((s) => (s.w === w && s.h === h ? s : { w, h }));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -63,7 +70,7 @@ export function ApyChart({
     const lo = Math.max(0, Math.floor(Math.min(...values) - 0.5));
     const hi = Math.ceil(Math.max(...values) + 0.5);
     const x = (t: number) => PAD.l + ((width - PAD.l - PAD.r) * (t - t0)) / (t1 - t0 || 1);
-    const y = (v: number) => PAD.t + (H - PAD.t - PAD.b) * (1 - (v - lo) / (hi - lo || 1));
+    const y = (v: number) => PAD.t + (height - PAD.t - PAD.b) * (1 - (v - lo) / (hi - lo || 1));
     const pts = data.map((p) => `${x(p.t).toFixed(1)},${y(p.apy).toFixed(1)}`);
     const ticks = [0, 1, 2, 3, 4].map((k) => {
       const v = lo + ((hi - lo) * k) / 4;
@@ -83,7 +90,7 @@ export function ApyChart({
       area: `M${pts.join('L')}L${x(t1)},${y(lo)}L${x(t0)},${y(lo)}Z`,
       last: lastPoint,
     };
-  }, [data, width]);
+  }, [data, width, height]);
 
   const point = active != null ? data[active] : undefined;
 
@@ -96,7 +103,8 @@ export function ApyChart({
     const py = model.y(point.apy);
     setTipPos({
       left: Math.min(wrap.current.clientWidth - tw, Math.max(0, px - tw / 2)),
-      top: Math.max(0, py - th - 12 + 30),
+      // Above the point; it may rise over the row of range buttons, but not past it.
+      top: Math.max(-30, py - th - 12),
     });
   }, [model, point]);
 
@@ -134,9 +142,9 @@ export function ApyChart({
       : 'Not enough history for this range';
 
   return (
-    <div ref={wrap}>
+    <div ref={wrap} className="chart-box">
       <svg
-        viewBox={`0 0 ${width} ${H}`}
+        viewBox={`0 0 ${width} ${height}`}
         role="img"
         tabIndex={model ? 0 : -1}
         aria-label={
@@ -167,11 +175,11 @@ export function ApyChart({
                 <text className="axis-t" x={PAD.l - 8} y={tk.y + 3} textAnchor="end">{tk.text}</text>
               </g>
             ))}
-            <text className="axis-t" x={model.x(model.t0)} y={H - 6} textAnchor="start">{model.axis(model.t0)}</text>
+            <text className="axis-t" x={model.x(model.t0)} y={height - 6} textAnchor="start">{model.axis(model.t0)}</text>
             {model.t1 - model.t0 >= 3 * 3_600_000 ? (
-              <text className="axis-t" x={model.x((model.t0 + model.t1) / 2)} y={H - 6} textAnchor="middle">{model.axis((model.t0 + model.t1) / 2)}</text>
+              <text className="axis-t" x={model.x((model.t0 + model.t1) / 2)} y={height - 6} textAnchor="middle">{model.axis((model.t0 + model.t1) / 2)}</text>
             ) : null}
-            <text className="axis-t" x={model.x(model.t1)} y={H - 6} textAnchor="end">{model.axis(model.t1)}</text>
+            <text className="axis-t" x={model.x(model.t1)} y={height - 6} textAnchor="end">{model.axis(model.t1)}</text>
             <path d={model.area} fill="url(#vate-apy-fill)" />
             <path key={seriesKey} className="line draw" d={model.line} pathLength={1} />
             <circle cx={model.x(model.last.t)} cy={model.y(model.last.apy)} r="4" fill="#087F75" stroke="#fff" strokeWidth="2" />
@@ -180,13 +188,13 @@ export function ApyChart({
             </text>
             {point ? (
               <>
-                <line x1={model.x(point.t)} x2={model.x(point.t)} y1={PAD.t} y2={H - PAD.b} stroke="rgba(20,45,53,.4)" strokeDasharray="3 3" />
+                <line x1={model.x(point.t)} x2={model.x(point.t)} y1={PAD.t} y2={height - PAD.b} stroke="rgba(20,45,53,.4)" strokeDasharray="3 3" />
                 <circle cx={model.x(point.t)} cy={model.y(point.apy)} r="5" fill="#087F75" stroke="#fff" strokeWidth="2" />
               </>
             ) : null}
           </>
         ) : (
-          <text className="msg" x={width / 2} y={H / 2} textAnchor="middle">{message}</text>
+          <text className="msg" x={width / 2} y={height / 2} textAnchor="middle">{message}</text>
         )}
       </svg>
       <div ref={tip} className={`tip${point ? ' on' : ''}`} style={{ left: tipPos.left, top: tipPos.top }} aria-hidden="true">

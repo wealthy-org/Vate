@@ -324,23 +324,27 @@ function AppInner() {
       <main className="va-main">
         {view === 'vaults' ? (
           <section className="view" aria-labelledby="vaults-title">
-            <h1 className="title" id="vaults-title">Put your <span className="sym">{SYMBOL}</span> <em>in orbit</em></h1>
-            <p className="sub">
-              VATE Ranking scores curated {SYMBOL} vaults on {NETWORK.isTestnet ? NETWORK.label : 'Robinhood Chain'} by live yield, depth and
-              withdrawable liquidity. You pick, you sign, your wallet stays in control.
-            </p>
-            <StatCards
-              market={data.market}
-              ranking={data.ranking}
-              loading={data.loading}
-              marketError={data.marketError}
-              checksLoading={data.checksLoading}
-              block={block.data ?? null}
-              blockError={rpcDown}
-              rpcHost={rpc.host}
-            />
+            <div className="hero">
+              <div>
+                <h1 className="title" id="vaults-title">Put your <span className="sym">{SYMBOL}</span> <em>in orbit</em></h1>
+                <p className="sub">
+                  VATE Ranking scores curated {SYMBOL} vaults on {NETWORK.isTestnet ? NETWORK.label : 'Robinhood Chain'} by live yield, depth and
+                  withdrawable liquidity. You pick, you sign, your wallet stays in control.
+                </p>
+              </div>
+              <StatCards
+                market={data.market}
+                ranking={data.ranking}
+                loading={data.loading}
+                marketError={data.marketError}
+                checksLoading={data.checksLoading}
+                block={block.data ?? null}
+                blockError={rpcDown}
+                rpcHost={rpc.host}
+              />
+            </div>
             {issues.length > 0 || (data.marketError && data.market) ? (
-              <details className="data-note" style={{ margin: '-8px 0 18px' }}>
+              <details className="data-note" style={{ margin: '0 0 16px' }}>
                 <summary style={{ cursor: 'pointer' }}>
                   Data notice{issues.length ? ` (${issues.length})` : ''}: some figures are unavailable or come from a fallback source
                 </summary>
@@ -351,28 +355,27 @@ function AppInner() {
               </details>
             ) : null}
 
+            {/* Five blocks placed by name (styles/app.css): where each one sits depends on the width. */}
             <div className="grid">
               <VaultList ranking={data.ranking} selected={selected} loading={data.loading} onSelect={selectVault} />
-              <div>
-                <VaultDetail
-                  vault={vault}
-                  isPick={data.ranking.pick?.market.address === vault.market.address}
-                  market={data.market}
-                  loading={data.loading}
-                  marketError={data.marketError}
-                  now={now}
-                />
-                <ReasoningPanel
-                  ranking={data.ranking}
-                  market={data.market}
-                  selected={selected}
-                  loading={data.loading}
-                  marketError={data.marketError}
-                  checksLoading={data.checksLoading}
-                  onSelect={selectVault}
-                />
-                <InsightsFeed ranking={data.ranking} market={data.market} loading={data.loading} marketError={data.marketError} />
-              </div>
+              <VaultDetail
+                vault={vault}
+                isPick={data.ranking.pick?.market.address === vault.market.address}
+                market={data.market}
+                loading={data.loading}
+                marketError={data.marketError}
+                now={now}
+              />
+              <ReasoningPanel
+                ranking={data.ranking}
+                market={data.market}
+                selected={selected}
+                loading={data.loading}
+                marketError={data.marketError}
+                checksLoading={data.checksLoading}
+                onSelect={selectVault}
+              />
+              <InsightsFeed ranking={data.ranking} market={data.market} loading={data.loading} marketError={data.marketError} />
               <TxPanel
                 vault={vault}
                 mode={mode}
