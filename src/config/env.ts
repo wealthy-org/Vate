@@ -8,7 +8,7 @@
 //   NEXT_PUBLIC_RPC_FALLBACK_1 / _2     further RPC URLs (https, or http on localhost)
 //   NEXT_PUBLIC_DATA_MODE               proxy (default, via /api/market) | direct (browser calls the APIs)
 //   NEXT_PUBLIC_VATE_TOKEN_ADDRESS      VATE token contract; empty shows "Contract pending"
-//   NEXT_PUBLIC_X_URL                   official X account; empty shows "not announced yet"
+//   NEXT_PUBLIC_X_URL                   official X account; default https://x.com/VateVault
 //   NEXT_PUBLIC_SITE_URL                canonical origin for metadata
 //   NEXT_PUBLIC_TERMS_VERSION           version stamp of Terms/Privacy and of the risk acknowledgement
 //   NEXT_PUBLIC_OPERATOR_NAME           legal entity shown in Terms/Privacy (empty: "Draft" banner)
@@ -65,7 +65,8 @@ export const env = {
   operatorJurisdiction: text(process.env.NEXT_PUBLIC_OPERATOR_JURISDICTION),
   contactEmail: text(process.env.NEXT_PUBLIC_CONTACT_EMAIL),
   hostingProvider: text(process.env.NEXT_PUBLIC_HOSTING_PROVIDER),
-  xUrl: httpUrl(process.env.NEXT_PUBLIC_X_URL),
+  /** The official X account, linked from every header and footer. */
+  xUrl: httpUrl(process.env.NEXT_PUBLIC_X_URL) ?? 'https://x.com/VateVault',
   siteUrl: httpUrl(process.env.NEXT_PUBLIC_SITE_URL),
   /** `proxy` (default): read market data through this app's cached /api routes first. */
   dataMode: (process.env.NEXT_PUBLIC_DATA_MODE === 'direct' ? 'direct' : 'proxy') as 'proxy' | 'direct',

@@ -237,6 +237,52 @@ body {
   color: var(--accent);
 }
 
+/* Link to the official X account: a round icon button in every header and footer, a pill where
+   the handle is shown beside the logo. The colours are set on the logo and the handle themselves,
+   so the link colours of the navigation around the button never reach them. Each place sets its
+   own --xlink-size to match its neighbours. */
+.xlink {
+  --xlink-size: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: var(--xlink-size);
+  height: var(--xlink-size);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  transition: background 0.3s, border-color 0.3s;
+}
+.xlink svg {
+  flex: none;
+  display: block;
+  width: calc(var(--xlink-size) * 0.38);
+  height: calc(var(--xlink-size) * 0.38);
+  fill: var(--text-primary);
+  transition: fill 0.3s;
+}
+.xlink span {
+  font: 500 12px/1 var(--f-m);
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+.xlink.named {
+  padding: 0 15px 0 13px;
+}
+.xlink:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.xlink:hover svg {
+  fill: #fff;
+}
+.xlink:hover span {
+  color: #fff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

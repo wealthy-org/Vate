@@ -52,6 +52,7 @@ html.lp-locked, html.lp-locked body { overflow: hidden; height: 100vh; }
   .links a:hover::before, .links a.active::before { transform: scaleX(1); }
   .links a:hover::after, .links a.active::after { background: var(--accent); transform: rotate(45deg); }
   .nav-r { display: flex; align-items: center; gap: 26px; }
+  .nav-r .xlink { margin-right: -14px; } /* 36px like Launch App, and close to it */
   .sound { display: flex; align-items: center; gap: 2px; height: 30px; padding: 0 8px; border-radius: 8px; }
   .sound span { width: 2px; height: 4px; background: var(--text-secondary); transition: height 0.3s; }
   .sound[aria-pressed="true"] span { animation: lp-bars 1s ease-in-out infinite; background: var(--accent); }
@@ -170,9 +171,9 @@ html.lp-locked, html.lp-locked body { overflow: hidden; height: 100vh; }
   .fgrid > div:nth-child(3n) { border-right: 0; }
   .fgrid > div:nth-child(-n + 3) { border-bottom: 1px dashed var(--faint); }
   .fgrid .c { text-align: center; display: grid; place-items: center; color: var(--text-primary); }
-  .fgrid .soc { display: flex; gap: 14px; flex-wrap: wrap; }
-  .fgrid .soc a, .flinks a { color: var(--text-secondary); transition: color 0.3s; }
-  .fgrid .soc a:hover, .flinks a:hover { color: var(--accent-hover); }
+  .fgrid .soc { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .flinks a { color: var(--text-secondary); transition: color 0.3s; }
+  .flinks a:hover { color: var(--accent-hover); }
   .fgrid .ca { margin-top: 14px; font-size: 11px; }
   .flinks { display: flex; flex-direction: column; gap: 6px; justify-content: flex-end; min-height: 210px; }
   .flinks.r { flex-direction: row; justify-content: space-between; align-items: flex-end; }
@@ -238,6 +239,7 @@ html.lp-locked, html.lp-locked body { overflow: hidden; height: 100vh; }
 }
 @media (max-width: 560px) {
   .lp .nav-r { gap: 10px; }
+  .lp .nav-r .xlink { --xlink-size: 32px; margin-right: 0; }
   .lp .launch { padding: 9px 12px; font-size: 11px; }
   .lp .hero { padding-bottom: 5vh; }
   .lp .hero .ca-addr { max-width: 34vw; }

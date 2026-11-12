@@ -10,6 +10,7 @@ import { SITE } from '@/config/site';
 import { Mark } from '@/components/shared/Mark';
 import { Providers } from '@/components/shared/Providers';
 import { TokenChip } from '@/components/shared/TokenChip';
+import { XLink } from '@/components/shared/XLink';
 import { useLatestBlock, useRanking, useRpcStatus } from '@/hooks/useMarketData';
 import { useReconciler, useTxStore, useWalletConnection, useWalletData, type WalletOption } from '@/hooks/useWallet';
 import { getPublicClient } from '@/lib/chain/client';
@@ -277,6 +278,7 @@ function AppInner() {
         <div className="hdr-r">
           <Link className="status" href="/docs">Docs ↗</Link>
           <span className={`status${rpcDown ? ' off' : block.data == null ? ' idle' : ''}`} role="status"><i /><span>{netLabel}</span></span>
+          <XLink />
           <button
             ref={walletBtn}
             className="btn wallet"
@@ -432,14 +434,16 @@ function AppInner() {
       </main>
 
       <footer className="va-footer">
-        <span className="left">© {SITE.year} VATE <TokenChip /></span>
-        <nav aria-label="Footer">
-          <Link href="/">Home</Link>
-          <Link href="/docs">Docs</Link>
-          <Link href="/terms">Terms &amp; Conditions</Link>
-          <Link href="/privacy">Privacy Policy</Link>
-          {SITE.xUrl ? <a href={SITE.xUrl} target="_blank" rel="noopener noreferrer">X ↗</a> : null}
-        </nav>
+        <span className="left"><span>© {SITE.year} VATE</span> <TokenChip /></span>
+        <div className="right">
+          <nav aria-label="Footer">
+            <Link href="/">Home</Link>
+            <Link href="/docs">Docs</Link>
+            <Link href="/terms">Terms &amp; Conditions</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+          </nav>
+          <XLink />
+        </div>
       </footer>
 
       <WalletModal open={walletModal} onClose={() => setWalletModal(false)} options={wallet.options} onPick={pickWallet} connecting={wallet.connecting} error={connectError} />

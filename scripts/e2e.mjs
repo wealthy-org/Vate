@@ -5,7 +5,7 @@
 //   3. injects an EIP-6963 test wallet backed by an Anvil dev account,
 //   4. walks through connect, faucet, deposit, rejection, portfolio, the share card, partial
 //      withdraw, MAX, the no-adapter liquidity cap, wrong network, the phone layout,
-//      reload/reconnect and disconnect,
+//      reload/reconnect, disconnect and the link to X,
 //   5. checks the landing page's music (starts with the first interaction; the sound button
 //      switches it off and on and is remembered) and its pointer lens.
 // Requires Foundry (anvil) and Playwright's Chromium (pnpm exec playwright install chromium).   pnpm test:e2e
@@ -25,7 +25,8 @@ const RPC = 'http://127.0.0.1:8545';
 const APP = 'http://127.0.0.1:3100';
 const ACCOUNT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'; // Anvil dev account #1 (local only)
 const DEPLOYER_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'; // Anvil dev key #0
-const env = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', VATE_DIST_DIR: '.next-e2e', NEXT_PUBLIC_RPC_PRIMARY: RPC, NEXT_PUBLIC_VATE_NETWORK: 'testnet' };
+const X_URL = 'https://x.com/VateVault'; // the official account; set for the build below so a local .env cannot change it
+const env = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', VATE_DIST_DIR: '.next-e2e', NEXT_PUBLIC_RPC_PRIMARY: RPC, NEXT_PUBLIC_VATE_NETWORK: 'testnet', NEXT_PUBLIC_X_URL: X_URL };
 mkdirSync(out, { recursive: true });
 
 // Building into .next-e2e makes Next repoint next-env.d.ts at that directory. Remember the file so
@@ -380,6 +381,19 @@ async function main() {
   await page.locator('.acct-menu button', { hasText: 'Disconnect' }).click();
   await page.locator('.btn.wallet', { hasText: 'Connect wallet' }).waitFor({ timeout: 10_000 });
   check('disconnect returns to the read-only state', (await cta.textContent()) === 'Connect wallet');
+
+  // the X button: the official account, in a new tab that cannot reach back into this one
+  await context.route(`${new URL(X_URL).origin}/**`, (route) => route.fulfill({ contentType: 'text/html', body: '<title>X</title>' })); // answered here: the test sends nothing to X
+  const xOpened = [];
+  for (const where of ['header', 'footer']) {
+    const [tab] = await Promise.all([context.waitForEvent('page', { timeout: 10_000 }), page.locator(`.va-${where} a.xlink`).click()]);
+    await tab.waitForURL(X_URL, { timeout: 10_000 }).catch(() => {});
+    const alone = await tab.evaluate(() => window.opener === null).catch(() => false);
+    xOpened.push(`${where}: ${tab.url()}${alone ? '' : ' (can reach the page that opened it)'}`);
+    await tab.close();
+    await page.bringToFront();
+  }
+  check('the X button in the header and in the footer opens the official account in a new tab', xOpened.join(' | ') === `header: ${X_URL} | footer: ${X_URL}`, xOpened.join(' | '));
 
   // landing page sound (the notes themselves are covered by tests/unit/score.test.ts)
   await page.addInitScript(() => {

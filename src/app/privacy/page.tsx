@@ -103,6 +103,11 @@ export default function PrivacyPage() {
                 <td>Your IP address and the page you open.</td>
               </tr>
               <tr>
+                <td>X<br /><code>{new URL(SITE.xUrl).host}</code></td>
+                <td>Only when you click the X button in the header or footer. It is a plain link: nothing is loaded from X before that.</td>
+                <td>Your IP address and the page you open, and your X account if you are signed in there. X is not told which page you came from.</td>
+              </tr>
+              <tr>
                 <td>Hosting<br /><Pending value={SITE.hostingProvider} what="hosting provider" /></td>
                 <td>Delivering this website.</td>
                 <td>Your IP address, browser type and the pages requested, in standard server logs kept by the provider.</td>

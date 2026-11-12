@@ -52,6 +52,7 @@
   .tabs button:hover { color: var(--text-primary); }
   .tabs button[aria-selected="true"] { background: var(--text-primary); color: #fff; }
   .hdr-r { margin-left: auto; display: flex; align-items: center; gap: 12px; position: relative; }
+  .hdr-r .xlink { --xlink-size: 42px; } /* as tall as the wallet button beside it */
   .status { display: flex; align-items: center; gap: 8px; font: 500 11px/1 var(--f-m); color: var(--text-secondary); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
   .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(19, 122, 86, 0.16); animation: vate-pulse 2s infinite; flex: none; }
   .status.off i { background: var(--error); box-shadow: 0 0 0 3px rgba(var(--error-rgb), 0.16); }
@@ -308,7 +309,10 @@
   /* ---- footer ---------------------------------------------------------------------------- */
   .va-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px; padding: 18px var(--gut) 22px; border-top: 1px dashed var(--border-strong); font-size: 13px; color: var(--text-secondary); }
   .va-footer .left { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+  .va-footer .right { display: flex; align-items: center; gap: 18px; }
   .va-footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
+  /* The size of the round button in the token widget. The margin keeps a row of links as tall as its text. */
+  .va-footer .xlink { --xlink-size: 30px; margin-block: -6px; }
   .va-footer a:hover { color: var(--accent-hover); }
   .va-footer .ca { font-size: 11px; }
 
@@ -417,6 +421,8 @@
   .va .stats { grid-template-columns: 1fr 1fr; }
   .va .pf-top { grid-template-columns: 1fr; }
   .va .hdr-r .status { display: none; }
+  .va .hdr-r { gap: 8px; }
+  .va .hdr-r .xlink { --xlink-size: 40px; }
   .va .va-header { flex-wrap: wrap; gap: 12px; }
   .va .tabs { order: 3; width: 100%; margin-left: 0; }
   .va .tabs button { flex: 1; padding: 8px 6px; }
@@ -443,6 +449,15 @@
   /* The transactions stay a table, one line per row: it scrolls sideways when it has to. */
   .va .tbl-wrap table.t:not(.pos) th, .va .tbl-wrap table.t:not(.pos) td { padding-left: 14px; padding-right: 14px; white-space: nowrap; }
   .va .tbl-wrap table.t:not(.pos) td[colspan] { white-space: normal; }
+}
+/* On a phone the wallet button grows when it has to say "wrong network": that message keeps the
+   row to itself, and the X button stays in the footer. */
+@media (max-width: 430px) {
+  .va .hdr-r:has(.wrong-t) .xlink { display: none; }
+}
+@media (max-width: 359px) {
+  .va .hdr-r { gap: 6px; }
+  .va .hdr-r .xlink { --xlink-size: 36px; }
 }
 /* The detail card by its own width: the button keeps the top corner once there is room beside the
    name; in a narrow column the figures go two by two and the facts one per line. */
@@ -498,4 +513,11 @@
   .va .amount input { font-size: 22px; }
   .va .kv { gap: 10px 20px; }
   .va .card-b { padding: 16px; }
+}
+/* Too narrow for the footer links and the X button in one row: the footer's two groups dissolve,
+   and the button sits at the end of the copyright line instead of on a row of its own. */
+@media (max-width: 420px) {
+  .va .va-footer .left, .va .va-footer .right { display: contents; }
+  .va .va-footer .ca { order: 1; }
+  .va .va-footer nav { order: 2; }
 }

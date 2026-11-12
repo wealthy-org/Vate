@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as R
 import { Mark } from '@/components/shared/Mark';
 import { QueryProvider } from '@/components/shared/QueryProvider';
 import { TokenChip } from '@/components/shared/TokenChip';
+import { XLink } from '@/components/shared/XLink';
 import { SITE } from '@/config/site';
 import { useRanking } from '@/hooks/useMarketData';
 import { kv, storageKeys } from '@/lib/storage';
@@ -506,6 +507,7 @@ function LandingInner() {
           <button className="sound" type="button" aria-pressed={soundOn} aria-label="Ambient sound" title={soundOn ? 'Turn ambient sound off' : 'Turn ambient sound on'} onClick={toggleSound}>
             <span /><span /><span /><span /><span />
           </button>
+          <XLink onMouseEnter={tick} />
           <Link className="launch" href="/app" onMouseEnter={tick}>Launch App <Arrow /></Link>
         </div>
       </header>
@@ -661,11 +663,7 @@ function LandingInner() {
           </div>
           <div className="c">VATE {SITE.year}</div>
           <div className="soc">
-            {SITE.xUrl ? (
-              <a href={SITE.xUrl} target="_blank" rel="noopener noreferrer">X / Twitter ↗</a>
-            ) : (
-              <span>Official social accounts have not been announced yet.</span>
-            )}
+            <XLink named />
           </div>
           <div className="flinks">
             <a href="#home" onClick={scrollTo('home')}>Home</a>

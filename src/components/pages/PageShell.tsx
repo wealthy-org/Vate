@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Mark } from '@/components/shared/Mark';
+import { XLink } from '@/components/shared/XLink';
 import { SITE } from '@/config/site';
 import { TocNav } from './TocNav';
 
@@ -47,6 +48,7 @@ export function PageShell({
             <Link key={n.href} href={n.href} aria-current={n.href === current ? 'page' : undefined}>{n.label}</Link>
           ))}
         </nav>
+        <XLink />
         <Link className="launch" href="/app">Launch App ↗</Link>
       </header>
       <div className="dp-hero">
@@ -61,13 +63,16 @@ export function PageShell({
       </div>
       <footer className="dp-footer">
         <span>© {SITE.year} VATE</span>
-        <nav aria-label="Footer">
-          <Link href="/">Home</Link>
-          <Link href="/app">Launch App</Link>
-          <Link href="/docs">Docs</Link>
-          <Link href="/terms">Terms &amp; Conditions</Link>
-          <Link href="/privacy">Privacy Policy</Link>
-        </nav>
+        <div className="right">
+          <nav aria-label="Footer">
+            <Link href="/">Home</Link>
+            <Link href="/app">Launch App</Link>
+            <Link href="/docs">Docs</Link>
+            <Link href="/terms">Terms &amp; Conditions</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+          </nav>
+          <XLink />
+        </div>
       </footer>
     </div>
   );
