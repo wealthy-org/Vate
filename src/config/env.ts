@@ -9,7 +9,7 @@
 //   NEXT_PUBLIC_DATA_MODE               proxy (default, via /api/market) | direct (browser calls the APIs)
 //   NEXT_PUBLIC_VATE_TOKEN_ADDRESS      VATE token contract; empty shows "Contract pending"
 //   NEXT_PUBLIC_X_URL                   official X account; default https://x.com/VateVault
-//   NEXT_PUBLIC_SITE_URL                canonical origin for metadata
+//   NEXT_PUBLIC_SITE_URL                canonical origin for metadata, and the link in a post shared from a card
 //   NEXT_PUBLIC_TERMS_VERSION           version stamp of Terms/Privacy and of the risk acknowledgement
 //   NEXT_PUBLIC_OPERATOR_NAME           legal entity shown in Terms/Privacy (empty: "Draft" banner)
 //   NEXT_PUBLIC_OPERATOR_JURISDICTION   governing jurisdiction shown in Terms

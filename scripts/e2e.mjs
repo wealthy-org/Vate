@@ -3,7 +3,8 @@
 //   1. forks Robinhood Chain Testnet locally with Anvil and deploys a fresh copy of the VATE test fixture,
 //   2. builds and serves the app pointed at that fork (separate build dir: .next-e2e),
 //   3. injects an EIP-6963 test wallet backed by an Anvil dev account,
-//   4. walks through connect, faucet, deposit, rejection, portfolio, the share card, partial
+//   4. walks through connect, faucet, deposit, rejection, portfolio, the share card (its options,
+//      the saved image, the copy, the post on X), a position this browser has no record of, partial
 //      withdraw, MAX, the no-adapter liquidity cap, wrong network, the phone layout,
 //      reload/reconnect, disconnect and the link to X,
 //   5. checks the landing page's music (starts with the first interaction; the sound button
@@ -26,7 +27,8 @@ const APP = 'http://127.0.0.1:3100';
 const ACCOUNT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'; // Anvil dev account #1 (local only)
 const DEPLOYER_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'; // Anvil dev key #0
 const X_URL = 'https://x.com/VateVault'; // the official account; set for the build below so a local .env cannot change it
-const env = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', VATE_DIST_DIR: '.next-e2e', NEXT_PUBLIC_RPC_PRIMARY: RPC, NEXT_PUBLIC_VATE_NETWORK: 'testnet', NEXT_PUBLIC_X_URL: X_URL };
+const SITE_URL = 'https://vate.example'; // the address a shared post links to; set for the same reason
+const env = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', VATE_DIST_DIR: '.next-e2e', NEXT_PUBLIC_RPC_PRIMARY: RPC, NEXT_PUBLIC_VATE_NETWORK: 'testnet', NEXT_PUBLIC_X_URL: X_URL, NEXT_PUBLIC_SITE_URL: SITE_URL };
 mkdirSync(out, { recursive: true });
 
 // Building into .next-e2e makes Next repoint next-env.d.ts at that directory. Remember the file so
@@ -160,6 +162,8 @@ async function main() {
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(walletScript, { rpc: RPC, account: ACCOUNT });
+  await context.route(`${new URL(X_URL).origin}/**`, (route) => route.fulfill({ contentType: 'text/html', body: '<title>X</title>' })); // answered here: the test sends nothing to X
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: APP });
   const page = await context.newPage();
   const problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text().slice(0, 200)); });
@@ -246,6 +250,16 @@ async function main() {
   const card = page.locator('.va-modal .scard');
   const cardStats = () => page.locator('.va-modal .sc-stats > div').evaluateAll((els) => els.map((e) => e.dataset.stat).join(','));
   const cardPrefs = () => page.evaluate(() => localStorage.getItem('vate-card-v1'));
+  // The card on screen, laid out at the size it is designed at (a 1200 × 630 picture inside its
+  // one-pixel border) instead of the size the dialog happens to give it.
+  const designShot = async () => {
+    const at = { position: 'fixed', left: '0', top: '0', 'z-index': '999', width: '1202px', 'max-width': 'none', height: '632px', margin: '0', 'border-radius': '0', 'box-shadow': 'none' };
+    // set through the element's style object: the page's CSP rightly refuses an injected style sheet
+    await card.evaluate((el, at) => { for (const [name, value] of Object.entries(at)) el.style.setProperty(name, value, 'important'); }, at);
+    const picture = await card.screenshot();
+    await card.evaluate((el, at) => { for (const name of Object.keys(at)) el.style.removeProperty(name); }, at);
+    return picture;
+  };
   await shareBtn.click();
   await card.waitFor({ timeout: 10_000 });
   check('share card opens from the position with the vault, the APY and the tracked figures',
@@ -272,6 +286,7 @@ async function main() {
     /\bnight\b/.test((await card.getAttribute('class')) ?? '') && (await page.locator('.va-modal .sc-art').getAttribute('data-art')) === 'satellite' && (await text('.va-modal .sc-wallet')) === '0x7099…79C8',
     `${await card.getAttribute('class')} | ${await text('.va-modal .sc-sub')}`);
   await shot('05c-share-card-night');
+  const otherCard = await designShot(); // a card that looks nothing like the default one, for comparison below
   await page.keyboard.press('Escape');
   await page.locator('.va-modal').waitFor({ state: 'detached' });
   check('share card: Escape closes it and focus returns to the Share button', await shareBtn.evaluate((el) => el === document.activeElement));
@@ -282,6 +297,122 @@ async function main() {
   await page.locator('.va-modal .sc-reset').click();
   check('share card: Reset restores the defaults and forgets the choices',
     /\bbright\b/.test((await card.getAttribute('class')) ?? '') && (await text('.va-modal .sc-label')) === 'Current APY' && (await cardStats()) === 'deposited,value,profit,held' && (await cardPrefs()) === null, await cardStats());
+
+  // share card: taken along as an image
+  const said = (re) => page.locator('.va-modal .sc-say.on', { hasText: re }).waitFor({ timeout: 10_000 }).then(() => text('.va-modal .sc-say'), () => text('.va-modal .sc-say'));
+  const onScreen = await designShot();
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), page.getByRole('button', { name: 'Save image' }).click()]);
+  const saved = readFileSync(await download.path());
+  const size = saved.subarray(1, 4).toString() === 'PNG' ? `${saved.readUInt32BE(16)}×${saved.readUInt32BE(20)}` : 'not a PNG';
+  const savedSaid = await said(/Download started/);
+  check('share card: Save image downloads the card as a 2400 × 1260 PNG named after the vault',
+    download.suggestedFilename() === 'vate-test-vault-i-card.png' && size === '2400×1260' && savedSaid === 'Download started: vate-test-vault-i-card.png' && (await text('.va-modal .sc-note')).startsWith('PNG · 2400 × 1260'),
+    `${download.suggestedFilename()} ${size}, ${Math.round(saved.length / 1024)} kB | ${savedSaid}`);
+  writeFileSync(join(out, '05d-share-card-saved.png'), saved);
+  // The image is painted by its own code (src/lib/card-image.ts), not copied from the screen. To
+  // see that both show the same card, each is cut into squares of 30 design pixels and the mean
+  // colour of every square is compared. How a letter's edge is smoothed does not move a mean; a
+  // label that is missing, a figure that sits elsewhere or a line in another colour does.
+  const likeness = (image, screen) => page.evaluate(async ([image, screen]) => {
+    const CELL = 30, COLS = 1200 / CELL, ROWS = 630 / CELL;
+    const means = async (base64, border) => {
+      const picture = new Image();
+      picture.src = `data:image/png;base64,${base64}`;
+      await picture.decode();
+      const w = picture.naturalWidth - 2 * border, h = picture.naturalHeight - 2 * border;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(picture, -border, -border);
+      const { data } = ctx.getImageData(0, 0, w, h);
+      const per = (w / 1200) * CELL; // pixels of this picture per square
+      const sums = new Float64Array(COLS * ROWS * 3);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const c = (Math.floor(y / per) * COLS + Math.floor(x / per)) * 3, i = (y * w + x) * 4;
+        sums[c] += data[i];
+        sums[c + 1] += data[i + 1];
+        sums[c + 2] += data[i + 2];
+      }
+      return { w, h, means: sums.map((v) => v / (per * per)) };
+    };
+    const [p, q] = [await means(image, 0), await means(screen, 1)];
+    let worst = 0, off = 0;
+    for (let c = 0; c < p.means.length; c += 3) {
+      const d = Math.max(Math.abs(p.means[c] - q.means[c]), Math.abs(p.means[c + 1] - q.means[c + 1]), Math.abs(p.means[c + 2] - q.means[c + 2]));
+      worst = Math.max(worst, d);
+      if (d > 6) off += 1;
+    }
+    return { worst, off, squares: COLS * ROWS, sizes: `${p.w}×${p.h} and ${q.w}×${q.h}` };
+  }, [image.toString('base64'), screen.toString('base64')]);
+  const same = await likeness(saved, onScreen);
+  const other = await likeness(saved, otherCard);
+  // Measured while writing this check: the same card gives a worst square of 7 to 10, with at most
+  // 4 squares over 6. The smallest faults tried: one small label missing gives a worst square of
+  // 17; the chart line in another colour puts 38 squares over 6. The limits sit halfway.
+  check('share card: the saved image shows the same card as the dialog', same.sizes === '2400×1260 and 1200×630' && same.worst < 13 && same.off <= 20 && other.worst > 60,
+    `worst of ${same.squares} squares differs by ${same.worst.toFixed(1)} of 255, ${same.off} differ by more than 6 | against a different card: ${other.worst.toFixed(0)}, ${other.off} squares`);
+
+  // share card: copied, and taken to X
+  const clipboard = () => page.evaluate(async () => {
+    const items = await navigator.clipboard.read();
+    const found = [];
+    for (const item of items) for (const type of item.types) {
+      const bitmap = type.startsWith('image/') ? await createImageBitmap(await item.getType(type)) : null;
+      found.push(bitmap ? `${type} ${bitmap.width}×${bitmap.height}` : type);
+    }
+    return found.join(', ');
+  }).catch((e) => `unreadable (${String(e).slice(0, 80)})`);
+  await page.evaluate(() => navigator.clipboard.writeText('something else'));
+  await page.getByRole('button', { name: 'Copy image' }).click();
+  const copySaid = await said(/Image copied/);
+  check('share card: Copy image puts the card on the clipboard as an image', (await clipboard()) === 'image/png 2400×1260' && copySaid === 'Image copied', `${await clipboard()} | ${copySaid}`);
+  await page.evaluate(() => navigator.clipboard.writeText('something else'));
+  // read in one go, so a refresh between two reads cannot make them differ
+  const share = await page.evaluate(() => ({
+    sentence: `${document.querySelector('.va-modal .sc-name').textContent}: ${document.querySelector('.va-modal .sc-value').textContent} APY right now on @VateVault (testnet, no real value)`,
+    href: document.querySelector('.va-modal a.sc-do.x').href,
+  }));
+  const [post] = await Promise.all([context.waitForEvent('page', { timeout: 15_000 }), page.getByRole('link', { name: /^Share on X/ }).click()]);
+  await post.waitForLoadState('domcontentloaded').catch(() => {});
+  const posted = new URL(post.url());
+  const alone = await post.evaluate(() => window.opener === null).catch(() => false);
+  await post.close();
+  await page.bringToFront();
+  const shareSaid = await said(/Paste it into your post/);
+  check('share card: Share on X opens a post with the sentence about the card and the link to the site, in a tab that cannot reach back',
+    posted.origin + posted.pathname === 'https://x.com/intent/post' && [...posted.searchParams.keys()].join() === 'text,url' && posted.searchParams.get('url') === SITE_URL
+      && new URL(share.href).searchParams.get('text') === share.sentence && [share.href, await page.locator('.va-modal a.sc-do.x').evaluate((a) => a.href)].includes(posted.href) && alone && !/\$/.test(posted.searchParams.get('text')),
+    `${posted.origin}${posted.pathname} | ${posted.searchParams.get('text')} | ${posted.searchParams.get('url')}${alone ? '' : ' | can reach the page that opened it'}`);
+  check('share card: Share on X copies the image as well, to be pasted into the post', (await clipboard()) === 'image/png 2400×1260' && /^Image copied\. Paste it into your post/.test(shareSaid), `${await clipboard()} | ${shareSaid}`);
+  await page.locator('.va-modal .sc-bar .btn', { hasText: 'Done' }).click();
+  await page.locator('.va-modal').waitFor({ state: 'detached' });
+
+  // A position this browser has no record of (opened in another browser, or by a script): what
+  // went into it is read back from the vault's own records, so it gets its figures all the same.
+  const forgotten = await page.evaluate(() => {
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('vate-pos-v1-'));
+    for (const k of keys) localStorage.removeItem(k);
+    return keys.length;
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('.tabs button', { hasText: 'Portfolio' }).click();
+  const stored = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('vate-pos-v1-')).map((k) => JSON.parse(localStorage.getItem(k))));
+  const profitRead = async () => ((await page.locator('table.t.pos tbody tr td:nth-child(4)').first().textContent().catch(() => '')) ?? '').trim();
+  await page.waitForFunction(() => Object.keys(localStorage).some((k) => k.startsWith('vate-pos-v1-')) && /^[+−]?\d/.test(document.querySelector('table.t.pos tbody tr td:nth-child(4)')?.textContent?.trim() ?? ''), null, { timeout: 60_000 }).catch(() => {});
+  const readBack = await stored();
+  check('a position this browser has no record of gets its deposits read back from the chain',
+    // a block's time is in whole seconds, the browser's own record of a deposit is not: this one came from the chain
+    forgotten === 1 && /^[+−]?\d/.test(await profitRead()) && readBack.length === 1 && readBack[0].deposited === '1000000000' && readBack[0].withdrawn === '0' && readBack[0].openedAt > 1_700_000_000_000 && readBack[0].openedAt % 1000 === 0,
+    `forgot ${forgotten} | profit ${await profitRead()} | stored ${JSON.stringify(readBack[0] ?? null).slice(0, 160)}`);
+  await shareBtn.click();
+  await card.waitFor();
+  const offered = await page.evaluate(() => ({
+    headlines: [...document.querySelectorAll('.va-modal .sc-seg.n3 input')].filter((i) => !i.disabled).length,
+    held: !document.querySelector('.va-modal .sc-switch input[disabled]'),
+  }));
+  check('…and its share card offers every headline and the time held', offered.headlines === 3 && offered.held && (await cardStats()) === 'deposited,value,profit,held' && /^(<1m|\d+m)$/.test(await text('.va-modal [data-stat="held"] b')),
+    `${offered.headlines} headlines | time held ${offered.held ? 'offered' : 'greyed'} | ${await cardStats()} | held ${await text('.va-modal [data-stat="held"] b')}`);
   await page.locator('.va-modal .sc-bar .btn', { hasText: 'Done' }).click();
   await page.locator('.va-modal').waitFor({ state: 'detached' });
 
@@ -383,7 +514,6 @@ async function main() {
   check('disconnect returns to the read-only state', (await cta.textContent()) === 'Connect wallet');
 
   // the X button: the official account, in a new tab that cannot reach back into this one
-  await context.route(`${new URL(X_URL).origin}/**`, (route) => route.fulfill({ contentType: 'text/html', body: '<title>X</title>' })); // answered here: the test sends nothing to X
   const xOpened = [];
   for (const where of ['header', 'footer']) {
     const [tab] = await Promise.all([context.waitForEvent('page', { timeout: 10_000 }), page.locator(`.va-${where} a.xlink`).click()]);

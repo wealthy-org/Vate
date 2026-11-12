@@ -4,6 +4,7 @@ import { PageShell, Section, type TocItem } from '@/components/pages/PageShell';
 import { TokenChip } from '@/components/shared/TokenChip';
 import { explorerAddress, NETWORK, NETWORKS, type NetworkConfig } from '@/config/networks';
 import { SITE } from '@/config/site';
+import { CARD_IMAGE_SIZE } from '@/lib/card-image';
 import { shortAddress } from '@/lib/format';
 import '@/styles/pages.css';
 
@@ -196,17 +197,30 @@ export default function DocsPage() {
           shows your total, an estimate of daily earnings and your blended APY.
         </p>
         <p>
-          <strong>Profit</strong> is calculated from deposits and withdrawals made through VATE in the same browser: current value
-          plus tracked withdrawals minus tracked deposits. A position that was opened elsewhere shows <em>not tracked</em>, and one
-          whose shares changed outside this browser shows <em>incomplete</em>. Its value is still correct; only the cost basis is
-          unknown here. Clearing the browser data removes this local history, not your position.
+          <strong>Profit</strong> is the current value plus what you withdrew minus what you deposited. VATE keeps those totals
+          in this browser as you deposit and withdraw. When it has no totals for a position, or they no longer match the shares you
+          hold (a position opened or changed in another browser, another interface or by a script), it reads the vault&apos;s own
+          deposit and withdrawal records for your address from the chain, up to 270 million blocks back, and works the totals out
+          from them. The row says <em>reading…</em> meanwhile.
+        </p>
+        <p>
+          A position still shows <em>not tracked</em> or <em>incomplete</em> when those records cannot explain the shares you hold,
+          as with shares that were transferred to you, or when the RPC endpoint in use does not answer a search that long. Its
+          value is still correct; only the cost basis is unknown. Clearing the browser data removes the stored totals, not your
+          position.
         </p>
         <p>
           <strong>Share card.</strong> Every position has a <em>Share</em> button that opens a card for it: the vault, its current
-          APY and, for a position opened through VATE in this browser, the tracked profit, the return in percent and how long it has
-          been held. You choose the headline figure, a bright or night style and a drawing, and you can leave the amounts, the time
+          APY and, when the deposits behind the position are known, the profit, the return in percent and how long it has been
+          held. You choose the headline figure, a bright or night style and a drawing, and you can leave the amounts, the time
           held, the APY history or your wallet address off the card. The address is off unless you switch it on. Your choices are
-          kept in this browser; the card is not uploaded anywhere.
+          kept in this browser.
+        </p>
+        <p>
+          <em>Save image</em> downloads the card as a PNG of {CARD_IMAGE_SIZE.width} × {CARD_IMAGE_SIZE.height} pixels and{' '}
+          <em>Copy image</em> puts it on the clipboard. <em>Share on X</em> opens a post on X with a sentence and a link filled in.
+          X accepts no image from a link, so the button also copies the image for you to paste into the post. The image is made in
+          your browser and goes nowhere unless you save, paste or post it.
         </p>
       </Section>
 

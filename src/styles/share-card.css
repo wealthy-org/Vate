@@ -77,7 +77,7 @@
 
 .sc-head { position: absolute; left: 4cqw; top: 12.8cqw; z-index: 3; }
 .sc-label { font: 500 1.25cqw/1 var(--f-m); letter-spacing: 0.2em; text-transform: uppercase; color: var(--sc-muted); }
-.sc-value { margin-top: 1cqw; font-size: 9.2cqw; font-weight: 700; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sc-value { margin-top: 1cqw; font-size: 9.2cqw; font-weight: 700; line-height: 1; letter-spacing: -0.03em; white-space: nowrap; }
 .sc-value.up { color: var(--sc-accent); }
 .sc-value.down { color: var(--sc-down); }
 .sc-value small { margin-left: 0.35em; font-size: 0.3em; font-weight: 600; letter-spacing: 0; color: var(--sc-muted); }
@@ -102,7 +102,7 @@
 .sc-stats > div { min-width: 0; }
 .sc-stats > div:last-child:not(:first-child) { text-align: right; }
 .sc-stats span { display: block; font-size: 1.35cqw; color: var(--sc-muted); }
-.sc-stats b { display: block; margin-top: 0.55cqw; font-size: 2.6cqw; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sc-stats b { display: block; margin-top: 0.55cqw; font-size: 2.6cqw; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
 .sc-stats b small { margin-left: 0.3em; font-size: 0.5em; font-weight: 600; letter-spacing: 0; color: var(--sc-muted); }
 
 /* ---- The drawings (300 x 300 grid) --------------------------------------------------------- */
@@ -167,14 +167,58 @@
 .va-modal .sc-switch input:disabled + i { opacity: 0.45; }
 .va-modal .sc-switch:has(input:disabled) span { color: var(--text-muted); }
 
-.va-modal .sc-bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--border); background: var(--surface); border-radius: 0 0 18px 18px; }
-.va-modal .sc-note { margin-right: auto; font: 500 11px/1.4 var(--f-m); letter-spacing: 0.04em; color: var(--text-muted); }
-.va-modal .sc-reset { padding: 11px 16px; border: 0; border-radius: 999px; background: none; font: 600 13px/1.2 var(--f-d); color: var(--text-secondary); cursor: pointer; transition: color 0.2s, background 0.2s; }
+/* Under the choices: what is remembered, and the way back to the defaults. */
+.va-modal .sc-keep { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
+.va-modal .sc-keep span { font: 500 11px/1.45 var(--f-m); color: var(--text-muted); }
+.va-modal .sc-reset { flex: none; margin-right: -10px; padding: 8px 12px; border: 0; border-radius: 999px; background: none; font: 600 13px/1.2 var(--f-d); color: var(--text-secondary); cursor: pointer; transition: color 0.2s, background 0.2s; }
 .va-modal .sc-reset:hover:not(:disabled) { background: var(--surface-muted); color: var(--accent-hover); }
 .va-modal .sc-reset:disabled { opacity: 0.4; cursor: default; }
-.va-modal .sc-bar .btn { width: auto; margin: 0; padding: 11px 28px; }
-.va-modal .sc-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.va-modal .sc-bar .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+
+/* The bar: take the card along as an image, or to X. It measures itself, so what it shows
+   follows the room it has rather than the size of the window. */
+.va-modal .sc-bar { position: sticky; bottom: 0; z-index: 3; container: sc-bar / inline-size; display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--border); background: var(--surface); border-radius: 0 0 18px 18px; }
+.va-modal .sc-do { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 11px 18px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); font: 600 13px/1.2 var(--f-d); letter-spacing: 0.02em; color: var(--text-primary); white-space: nowrap; text-decoration: none; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; }
+.va-modal .sc-do svg { flex: none; width: 15px; height: 15px; }
+.va-modal .sc-do b { font-weight: inherit; }
+.va-modal .sc-do:hover { border-color: var(--accent); color: var(--accent-hover); }
+.va-modal .sc-do:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.va-modal .sc-do.main { border-color: var(--accent); background: var(--accent); color: #fff; }
+.va-modal .sc-do.main:hover { border-color: var(--accent-hover); background: var(--accent-hover); color: #fff; }
+.va-modal .sc-do.x { border-color: var(--text-primary); background: var(--text-primary); color: #fff; }
+.va-modal .sc-do.x:hover { border-color: #000; background: #000; color: #fff; }
+.va-modal .sc-do.x svg { width: 13px; height: 13px; }
+.va-modal .sc-note { min-width: 0; margin: 0 auto 0 6px; font: 500 11px/1.45 var(--f-m); letter-spacing: 0.04em; color: var(--text-muted); }
+.va-modal .sc-note i { display: block; font-style: normal; letter-spacing: 0; }
+.va-modal .sc-bar .btn { flex: none; width: auto; margin: 0; padding: 11px 22px; }
+/* What a button just did. It floats over the bar, so nothing moves when it appears. */
+.va-modal .sc-say { position: absolute; left: 50%; bottom: calc(100% + 10px); width: max-content; max-width: calc(100% - 28px); padding: 9px 14px; border-radius: 10px; background: var(--text-primary); box-shadow: var(--shadow-lg); font: 500 12.5px/1.4 var(--f-d); letter-spacing: 0.01em; text-align: center; color: #fff; pointer-events: none; opacity: 0; visibility: hidden; transform: translate(-50%, 6px); transition: opacity 0.2s, transform 0.3s var(--ease), visibility 0s 0.3s; }
+.va-modal .sc-say.on { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity 0.2s, transform 0.3s var(--ease); }
+.va-modal .sc-say.bad { background: #8c2733; }
+/* Widths of the bar's own content box. Each step gives up the least useful thing left. */
+@container sc-bar (max-width: 900px) {
+  .va-modal .sc-note i { display: none; }
+}
+@container sc-bar (max-width: 700px) {
+  .va-modal .sc-note { display: none; }
+  .va-modal .sc-bar .btn { margin-left: auto; }
+}
+@container sc-bar (max-width: 540px) {
+  .va-modal .sc-do b { display: none; }
+}
+@container sc-bar (max-width: 370px) {
+  .va-modal .sc-bar { gap: 6px; }
+  .va-modal .sc-do { gap: 6px; padding: 11px 12px; }
+  .va-modal .sc-bar .btn { padding: 11px 14px; }
+}
+@container sc-bar (max-width: 335px) {
+  .va-modal .sc-do:not(.x) svg { display: none; }
+}
+@container sc-bar (max-width: 290px) {
+  .va-modal .sc-do.x span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .va-modal .sc-say, .va-modal .sc-say.on { transition: none; }
+}
 
 /* Narrow windows: the card on top, the choices under it. */
 @media (max-width: 900px) {
@@ -193,9 +237,5 @@
   .va-modal .sc-box > h3 { padding: 15px 16px 13px; }
   .va-modal .sc-opts { padding: 14px 16px 16px; }
   .va-modal .sc-bar { padding: 10px 16px; }
-  .va-modal .sc-note { font-size: 10px; }
   .scard { border-radius: 10px; }
-}
-@media (max-width: 380px) {
-  .va-modal .sc-note { visibility: hidden; }
 }

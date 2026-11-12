@@ -1,7 +1,13 @@
 'use client';
 
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Mark } from '@/components/shared/Mark';
+import logo from '@/components/shared/vate-logo.png';
+import { XLogo } from '@/components/shared/XLink';
+import { SITE } from '@/config/site';
+import { CARD_IMAGE_SIZE, renderCardPng } from '@/lib/card-image';
+import { ART_GRID, artShapes, headlineSize, NO_ART, type ArtShape } from '@/lib/card-paint';
+import { cardFileName, shareText, xIntentUrl } from '@/lib/card-share';
 import {
   buildCard,
   DEFAULT_CARD_PREFS,
@@ -20,9 +26,10 @@ import { kv, storageKeys } from '@/lib/storage';
 import { Modal } from './ui';
 
 /**
- * The share card dialog: a preview of the card for one position, and the choices that shape it.
- * The card is laid out on the 1200 × 630 canvas link previews use and scales with its box, so
- * what is set up here is what an Open Graph image can show later.
+ * The share card dialog: a preview of the card for one position, the choices that shape it, and
+ * the ways to take it along: save it as an image, copy it, share it on X. The card is laid out on
+ * the 1200 × 630 canvas link previews use and scales with its box; the image is that canvas at
+ * twice the size.
  */
 export function ShareCardModal({ subject, onClose }: { subject: CardSubject | null; onClose: () => void }) {
   return (
@@ -51,10 +58,24 @@ const MOTIFS: { id: CardMotif; label: string }[] = [
   { id: 'vault', label: 'Vault' },
 ];
 
+/** What the buttons under the card say after they were used. */
+interface Notice {
+  id: number;
+  text: string;
+  bad: boolean;
+}
+
+/** "Ctrl+V", or the Mac key for it; empty where there is no keyboard to speak of. */
+function pasteKeys(): string {
+  if (typeof navigator === 'undefined' || window.matchMedia('(pointer: coarse)').matches) return '';
+  return /Mac|iPhone|iPad/i.test(navigator.platform) ? ' (⌘V)' : ' (Ctrl+V)';
+}
+
 function Editor({ subject, onClose }: { subject: CardSubject; onClose: () => void }) {
   const [prefs, setPrefs] = useState<CardPrefs>(() => parseCardPrefs(kv.get(storageKeys.card)));
   // The moment the dialog opened: "held" should not tick while the card is being set up.
   const [now] = useState(() => Date.now());
+  const [notice, setNotice] = useState<Notice | null>(null);
   const model = buildCard(subject, prefs, now);
   const group = useId();
 
@@ -69,6 +90,88 @@ function Editor({ subject, onClose }: { subject: CardSubject; onClose: () => voi
   };
   const untouched = (Object.keys(DEFAULT_CARD_PREFS) as (keyof CardPrefs)[]).every((k) => prefs[k] === DEFAULT_CARD_PREFS[k]);
   const tracked = model.available.profit;
+
+  // ---- the card as an image ---------------------------------------------------------------
+  // One image per look of the card, drawn once and kept until the card changes.
+  const signature = `${prefs.style}\n${JSON.stringify(model)}`;
+  const image = useRef<{ signature: string; blob: Promise<Blob> } | null>(null);
+  const drawn = (): Promise<Blob> => {
+    if (image.current?.signature !== signature) {
+      const blob = renderCardPng(model, prefs.style, logo.src);
+      blob.catch(() => {}); // reported where the image is used
+      image.current = { signature, blob };
+    }
+    return image.current.blob;
+  };
+  // Drawn ahead of the click, after a short pause so that flicking through the options does not
+  // draw every card in between: saving and copying then answer at once.
+  const latest = useRef(drawn);
+  latest.current = drawn;
+  useEffect(() => {
+    const timer = setTimeout(() => void latest.current(), 150);
+    return () => clearTimeout(timer);
+  }, [signature]);
+
+  const say = (text: string, bad = false) => setNotice({ id: Date.now(), text, bad });
+  useEffect(() => {
+    if (!notice) return;
+    // Sharing opens another tab: the message waits until this one is looked at again.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      if (document.visibilityState !== 'visible' || timer) return;
+      timer = setTimeout(() => setNotice(null), notice.bad ? 9000 : 5000);
+    };
+    start();
+    document.addEventListener('visibilitychange', start);
+    return () => {
+      document.removeEventListener('visibilitychange', start);
+      clearTimeout(timer);
+    };
+  }, [notice]);
+
+  const fileName = cardFileName(model.title);
+  // The address that goes into a post: the configured one, or wherever the site is served from.
+  // A site on a developer's own machine has no address worth posting.
+  const site = SITE.siteUrl ?? (window.location.protocol === 'https:' ? window.location.origin : null);
+  const postUrl = xIntentUrl(shareText(model, SITE.xHandle), site);
+  const canCopyImage = typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
+
+  const save = async () => {
+    try {
+      const url = URL.createObjectURL(await drawn());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      say(`Download started: ${fileName}`);
+    } catch {
+      say('The image could not be made in this browser.', true);
+    }
+  };
+
+  /** Puts the image on the clipboard. Has to be called from within the click. */
+  const putImage = (): Promise<boolean> => {
+    if (!canCopyImage) return Promise.resolve(false);
+    // The image is handed over as a promise, so that the call itself is made at once.
+    return navigator.clipboard.write([new ClipboardItem({ 'image/png': drawn() })]).then(() => true, () => false);
+  };
+  const copyImage = async () => {
+    if (await putImage()) say('Image copied');
+    else say(canCopyImage ? 'The browser did not allow the copy. Use Save image instead.' : 'This browser cannot copy images. Use Save image instead.', true);
+  };
+
+  // A link can hand X a text and an address, never an image. So the image is put on the
+  // clipboard on the way out, to be pasted into the post. The link itself opens X: nothing is
+  // awaited here, the copy only has to start within the click.
+  const shareOnX = () => {
+    void putImage().then((copied) => {
+      if (copied) say(`Image copied. Paste it into your post${pasteKeys()}.`);
+      else say('X opened without the image. Save it here and attach it to your post.', true);
+    });
+  };
 
   return (
     <>
@@ -95,7 +198,7 @@ function Editor({ subject, onClose }: { subject: CardSubject; onClose: () => voi
               ))}
             </div>
             {!tracked ? (
-              <p className="sc-hint">Profit is known only for deposits made through VATE in this browser, so this card leads with the APY.</p>
+              <p className="sc-hint">What went into this position is not known, so its profit is not either. This card leads with the APY.</p>
             ) : null}
           </fieldset>
 
@@ -121,7 +224,7 @@ function Editor({ subject, onClose }: { subject: CardSubject; onClose: () => voi
                   <label key={m.id} title={m.id === 'auto' ? 'Follows the position: a comet in profit, the orbit for the VATE Pick, the vault door otherwise' : undefined}>
                     <input type="radio" name={`${group}-motif`} checked={prefs.motif === m.id} onChange={() => change({ motif: m.id })} aria-label={m.label} />
                     <span>
-                      <i className="sc-theme bright" aria-hidden="true">{art ? <Art kind={art} /> : <NoArt />}</i>
+                      <i className="sc-theme bright" aria-hidden="true"><Art kind={art} /></i>
                       {m.label}
                     </span>
                   </label>
@@ -137,20 +240,57 @@ function Editor({ subject, onClose }: { subject: CardSubject; onClose: () => voi
               label="Time held"
               checked={prefs.held && tracked}
               disabled={!tracked}
-              hint={tracked ? undefined : 'Known only for positions opened through VATE in this browser'}
+              hint={tracked ? undefined : 'Not known for this position'}
               onChange={(held) => change({ held })}
             />
             <Switch label="APY history" checked={prefs.chart} onChange={(chart) => change({ chart })} />
             <Switch label="Wallet address" checked={prefs.wallet} onChange={(wallet) => change({ wallet })} />
           </fieldset>
+
+          <div className="sc-keep">
+            <span>Your choices are remembered in this browser.</span>
+            <button type="button" className="sc-reset" onClick={reset} disabled={untouched}>Reset</button>
+          </div>
         </div>
       </div>
       <div className="sc-bar">
-        <span className="sc-note">Your choices are remembered in this browser.</span>
-        <button type="button" className="sc-reset" onClick={reset} disabled={untouched}>Reset</button>
-        <button type="button" className="btn primary" onClick={onClose}>Done</button>
+        <p className={`sc-say${notice ? ' on' : ''}${notice?.bad ? ' bad' : ''}`} role="status" aria-live="polite">{notice?.text ?? ''}</p>
+        <button type="button" className="sc-do main" onClick={() => void save()} aria-label="Save image" title={`Download the card as ${fileName}`}>
+          <Icon d="M8 2v8M4.500 6.800 8 10.300l3.500-3.500M2.500 13.500h11" />
+          <span>Save<b> image</b></span>
+        </button>
+        <button type="button" className="sc-do" onClick={() => void copyImage()} aria-label="Copy image" title="Copy the card to the clipboard as an image">
+          <Icon d="M5.500 5.500h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1ZM2.500 10.500v-7a1 1 0 0 1 1-1h7" />
+          <span>Copy<b> image</b></span>
+        </button>
+        <a
+          className="sc-do x"
+          href={postUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={shareOnX}
+          aria-label="Share on X (opens in a new tab)"
+          title="Opens a post on X with the text filled in, and copies the image for you to paste into it"
+        >
+          <XLogo />
+          <span>Share<b> on X</b></span>
+        </a>
+        <span className="sc-note">
+          PNG · {CARD_IMAGE_SIZE.width} × {CARD_IMAGE_SIZE.height}
+          <i>Share on X copies the image: paste it into your post</i>
+        </span>
+        <button type="button" className="btn" onClick={onClose}>Done</button>
       </div>
     </>
+  );
+}
+
+/** A 16 × 16 line icon. */
+function Icon({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d={d} />
+    </svg>
   );
 }
 
@@ -174,20 +314,6 @@ function Switch({
       <i aria-hidden="true" />
     </label>
   );
-}
-
-/**
- * Font size of the big figure in card-width units: as large as the design allows, smaller when
- * a long amount would otherwise run under the drawing or off the card.
- */
-function headlineSize(model: CardModel): number {
-  const { value, unit } = model.headline;
-  // Widths in em of the figure's own font size: digits and signs about 0.6, separators 0.3; the unit is set at 0.3em.
-  let ems = 0;
-  for (const ch of value) ems += ch === ',' || ch === '.' ? 0.3 : ch === '%' ? 0.9 : 0.6;
-  if (unit) ems += 0.3 * (0.35 + unit.length * 0.64);
-  const room = model.art ? 58 : 90;
-  return Math.max(3.6, Math.min(model.chart ? 9.2 : 11.4, room / ems));
 }
 
 /** The card itself. Every size inside is relative to the card's own width, so it scales as one piece. */
@@ -270,115 +396,34 @@ function Chart({ chart }: { chart: CardChart }) {
   );
 }
 
-/** The tile for "no drawing". */
-function NoArt() {
+/**
+ * A drawing, as line art on a 300 × 300 grid; null is the tile for "no drawing". The shapes come
+ * from src/lib/card-paint.ts, which the saved image is drawn from as well. Colours come from the
+ * card theme through CSS classes, so the same drawing works on the bright card, on the night card
+ * and in the option tiles.
+ */
+function Art({ kind }: { kind: CardArt | null }) {
   return (
-    <svg viewBox="0 0 300 300" focusable="false">
-      <circle className="a-line dim" cx="150" cy="150" r="70" />
-      <path className="a-line dim" d="M100 200 200 100" />
+    <svg viewBox={`0 0 ${ART_GRID} ${ART_GRID}`} focusable="false">
+      <Shapes shapes={kind ? artShapes(kind) : NO_ART} />
     </svg>
   );
 }
 
-const TAU = Math.PI * 2;
-const polar = (r: number, turn: number): [number, number] => [150 + r * Math.cos(turn * TAU), 150 + r * Math.sin(turn * TAU)];
-const xy = ([x, y]: [number, number]) => `${x.toFixed(1)} ${y.toFixed(1)}`;
-
-/** A four-point sparkle centred on (x, y). */
-function Spark({ x, y, r }: { x: number; y: number; r: number }) {
-  const k = r * 0.28;
-  return <path className="a-spark" d={`M${x} ${y - r}L${x + k} ${y - k}L${x + r} ${y}L${x + k} ${y + k}L${x} ${y + r}L${x - k} ${y + k}L${x - r} ${y}L${x - k} ${y - k}Z`} />;
-}
-
-/**
- * The drawings, as line art on a 300 × 300 grid. Colours come from the card theme through CSS
- * classes, so the same drawing works on the bright card, on the night card and in the option tiles.
- */
-function Art({ kind }: { kind: CardArt }): ReactNode {
-  if (kind === 'orbit') {
-    return (
-      <svg viewBox="0 0 300 300" focusable="false">
-        <Spark x={50} y={62} r={13} />
-        <Spark x={252} y={236} r={9} />
-        <circle className="a-dot" cx="246" cy="58" r="3.5" />
-        <circle className="a-dot" cx="64" cy="232" r="3" />
-        {/* Rings: the far halves first, then the planet, then the near halves in front of it. */}
-        <g transform="rotate(-22 150 150)">
-          <path className="a-line dim" d="M12 150A138 50 0 0 1 288 150" />
-          <path className="a-line dim" d="M46 150A104 34 0 0 1 254 150" />
-        </g>
-        <circle className="a-fill" cx="150" cy="150" r="58" />
-        <path className="a-shade" d="M150 92a58 58 0 0 1 0 116a88 88 0 0 0 0-116Z" />
-        <path className="a-hi" d="M112 132q12-22 36-27" />
-        <g transform="rotate(-22 150 150)">
-          <path className="a-line" d="M12 150A138 50 0 0 0 288 150" />
-          <path className="a-line" d="M46 150A104 34 0 0 0 254 150" />
-          <circle className="a-moon" cx="288" cy="150" r="12" />
-          <circle className="a-pip" cx="46" cy="150" r="6.5" />
-        </g>
-      </svg>
-    );
-  }
-  if (kind === 'comet') {
-    return (
-      <svg viewBox="0 0 300 300" focusable="false">
-        <Spark x={62} y={72} r={12} />
-        <Spark x={254} y={224} r={10} />
-        <circle className="a-dot" cx="118" cy="42" r="3" />
-        <circle className="a-dot" cx="270" cy="168" r="3.5" />
-        <circle className="a-dot" cx="88" cy="150" r="2.5" />
-        {/* The tail: a soft plume and a brighter core, both narrowing to a point down and to the left. */}
-        <path className="a-tail" d="M186 62Q110 176 22 280Q126 192 240 116Z" />
-        <path className="a-tail strong" d="M199 77Q126 172 64 240Q134 180 225 103Z" />
-        <path className="a-line dim" d="M150 60 110 100M262 152 214 200" />
-        <circle className="a-fill" cx="212" cy="90" r="34" />
-        <circle className="a-core" cx="212" cy="90" r="15" />
-        <path className="a-line" d="M247 45a58 58 0 0 1 24 48" />
-      </svg>
-    );
-  }
-  if (kind === 'satellite') {
-    return (
-      <svg viewBox="0 0 300 300" focusable="false">
-        <Spark x={56} y={64} r={11} />
-        <circle className="a-dot" cx="250" cy="246" r="3.5" />
-        <circle className="a-dot" cx="78" cy="252" r="3" />
-        {/* Signal arcs from the dish. */}
-        <path className="a-line dim" d="M214 40a34 34 0 0 1 34 34" />
-        <path className="a-line dim" d="M214 18a56 56 0 0 1 56 56" />
-        <g transform="rotate(-28 150 158)">
-          <rect className="a-panel" x="14" y="126" width="88" height="64" rx="6" />
-          <path className="a-line thin" d="M43 126v64M73 126v64M14 158h88" />
-          <rect className="a-panel" x="198" y="126" width="88" height="64" rx="6" />
-          <path className="a-line thin" d="M227 126v64M257 126v64M198 158h88" />
-          <path className="a-line" d="M102 158h22M176 158h22M150 114V94" />
-          <rect className="a-body" x="124" y="114" width="52" height="88" rx="10" />
-          <circle className="a-fill" cx="150" cy="158" r="14" />
-          <circle className="a-core" cx="150" cy="158" r="5.5" />
-          <path className="a-dish" d="M122 92a28 28 0 0 0 56 0Z" />
-          <circle className="a-moon" cx="150" cy="80" r="6" />
-        </g>
-      </svg>
-    );
-  }
-  // The vault door: a round plate with bolts, and a five-spoke wheel.
-  const bolts = Array.from({ length: 12 }, (_, i) => polar(104, i / 12));
-  const spokes = Array.from({ length: 5 }, (_, i) => i / 5 - 0.25);
+function Shapes({ shapes }: { shapes: ArtShape[] }) {
   return (
-    <svg viewBox="0 0 300 300" focusable="false">
-      <rect className="a-moon" x="14" y="92" width="22" height="38" rx="6" />
-      <rect className="a-moon" x="14" y="170" width="22" height="38" rx="6" />
-      <circle className="a-body" cx="150" cy="150" r="120" />
-      <circle className="a-line dim" cx="150" cy="150" r="88" />
-      {bolts.map(([x, y], i) => <circle key={i} className="a-dot" cx={x.toFixed(1)} cy={y.toFixed(1)} r="4.5" />)}
-      <circle className="a-line" cx="150" cy="150" r="42" />
-      {spokes.map((t, i) => <path key={i} className="a-line" d={`M${xy(polar(15, t))}L${xy(polar(64, t))}`} />)}
-      {spokes.map((t, i) => {
-        const [x, y] = polar(70, t);
-        return <circle key={i} className="a-fill" cx={x.toFixed(1)} cy={y.toFixed(1)} r="9" />;
-      })}
-      <circle className="a-fill" cx="150" cy="150" r="15" />
-      <circle className="a-core" cx="150" cy="150" r="5.5" />
-    </svg>
+    <>
+      {shapes.map((s, i) =>
+        s.t === 'group' ? (
+          <g key={i} transform={`rotate(${s.rotate.join(' ')})`}><Shapes shapes={s.shapes} /></g>
+        ) : s.t === 'path' ? (
+          <path key={i} className={s.cls} d={s.d} />
+        ) : s.t === 'circle' ? (
+          <circle key={i} className={s.cls} cx={s.cx} cy={s.cy} r={s.r} />
+        ) : (
+          <rect key={i} className={s.cls} x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} />
+        ),
+      )}
+    </>
   );
 }

@@ -52,7 +52,7 @@ export default function PrivacyPage() {
               <tr><td><code>vate-ack-v1-{SITE.termsVersion}</code></td><td>That you ticked the risk acknowledgement for this version of the Terms.</td></tr>
               <tr><td><code>vate-wallet-v1.*</code></td><td>Which wallet you last connected, so an already approved session can be restored without a popup.</td></tr>
               <tr><td><code>vate-tx-{'{chainId}'}-{'{address}'}</code></td><td>Up to 200 deposits and withdrawals you made through VATE, for the activity list.</td></tr>
-              <tr><td><code>vate-pos-v1-{'{chainId}'}-{'{address}'}-{'{vault}'}</code></td><td>Running totals per vault, used only to calculate “Profit (tracked)” and the figures on a share card.</td></tr>
+              <tr><td><code>vate-pos-v1-{'{chainId}'}-{'{address}'}-{'{vault}'}</code></td><td>Running totals per vault (deposited, withdrawn, when the position was opened), kept as you transact or worked out from the vault’s public records on the chain. Used only to calculate “Profit (tracked)” and the figures on a share card.</td></tr>
               <tr><td><code>vate-pending-{'{chainId}'}-{'{address}'}</code></td><td>Transactions that were sent but not yet confirmed, so they can be checked again after a reload.</td></tr>
               <tr><td><code>vate-sound-v1</code></td><td>Whether you switched the landing page music off or back on.</td></tr>
               <tr><td><code>vate-card-v1</code></td><td>How you last set up a share card: the headline figure, the style, the drawing and what to include. No amounts or addresses.</td></tr>
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
             <tbody>
               <tr>
                 <td>RPC endpoints<br />{NETWORK.rpcUrls.map((u) => <div key={u}><code>{new URL(u).host}</code></div>)}</td>
-                <td>Latest block, vault data, your balances, allowances and positions, transaction receipts.</td>
+                <td>Latest block, vault data, your balances, allowances and positions, the deposit and withdrawal records of your positions, transaction receipts.</td>
                 <td>Your IP address and the public addresses being queried, which links the two.</td>
               </tr>
               {mainnetData ? (
@@ -104,8 +104,13 @@ export default function PrivacyPage() {
               </tr>
               <tr>
                 <td>X<br /><code>{new URL(SITE.xUrl).host}</code></td>
-                <td>Only when you click the X button in the header or footer. It is a plain link: nothing is loaded from X before that.</td>
-                <td>Your IP address and the page you open, and your X account if you are signed in there. X is not told which page you came from.</td>
+                <td>Only when you click the X button in the header or footer, or <em>Share on X</em> on a share card. Both are plain links: nothing is loaded from X before that.</td>
+                <td>
+                  Your IP address and the page you open, and your X account if you are signed in there. X is not told which page you came
+                  from. <em>Share on X</em> opens a post with a sentence about the card and a link to this site filled in; both are part of
+                  the address that is opened. The card image is not sent: it is copied to your clipboard and reaches X only if you paste
+                  and post it.
+                </td>
               </tr>
               <tr>
                 <td>Hosting<br /><Pending value={SITE.hostingProvider} what="hosting provider" /></td>
