@@ -54,7 +54,7 @@ export default function PrivacyPage() {
               <tr><td><code>vate-tx-{'{chainId}'}-{'{address}'}</code></td><td>Up to 200 deposits and withdrawals you made through VATE, for the activity list.</td></tr>
               <tr><td><code>vate-pos-v1-{'{chainId}'}-{'{address}'}-{'{vault}'}</code></td><td>Running totals per vault, used only to calculate “Profit (tracked)”.</td></tr>
               <tr><td><code>vate-pending-{'{chainId}'}-{'{address}'}</code></td><td>Transactions that were sent but not yet confirmed, so they can be checked again after a reload.</td></tr>
-              <tr><td><code>vate-sound-v1</code></td><td>That you turned the ambient sound on.</td></tr>
+              <tr><td><code>vate-sound-v1</code></td><td>Whether you switched the landing page music off or back on.</td></tr>
             </tbody>
           </table>
         </div>

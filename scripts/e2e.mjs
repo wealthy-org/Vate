@@ -5,7 +5,8 @@
 //   3. injects an EIP-6963 test wallet backed by an Anvil dev account,
 //   4. walks through connect, faucet, deposit, rejection, portfolio, partial withdraw, MAX,
 //      the no-adapter liquidity cap, wrong network, reload/reconnect and disconnect,
-//   5. checks the landing page's sound button: silent until asked, remembered, switched off again.
+//   5. checks the landing page's music (starts with the first interaction; the sound button
+//      switches it off and on and is remembered) and its pointer lens.
 // Requires Foundry (anvil) and Playwright's Chromium (pnpm exec playwright install chromium).   pnpm test:e2e
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -314,37 +315,65 @@ async function main() {
   // landing page sound (the notes themselves are covered by tests/unit/score.test.ts)
   await page.addInitScript(() => {
     window.__audio = [];
+    window.__firstInput = null;
     const Real = window.AudioContext;
-    if (Real) window.AudioContext = class extends Real { constructor(...args) { super(...args); window.__audio.push(this); } };
+    if (Real) window.AudioContext = class extends Real { constructor(...args) { super(...args); window.__audio.push({ at: performance.now(), ctx: this }); } };
+    for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, (e) => { if (e.isTrusted && window.__firstInput === null) window.__firstInput = performance.now(); }, true);
   });
   const sound = page.locator('.lp button.sound');
+  // Nothing may look at the page before the first click: Playwright runs its page scripts "as the
+  // user", which browsers count as an interaction, and that alone would let the music start.
   const openLanding = async () => {
-    await page.goto(`${APP}/`, { waitUntil: 'domcontentloaded' });
-    // React marks the nodes it has taken over; a click before that would reach nothing.
-    await page.waitForFunction(() => { const b = document.querySelector('.lp button.sound'); return !!b && Object.keys(b).some((k) => k.startsWith('__reactProps')); }, null, { timeout: 30_000 });
-    await page.waitForTimeout(300);
+    await page.goto(`${APP}/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
   };
-  const soundState = async () => ({
-    pressed: await sound.getAttribute('aria-pressed'),
-    saved: await page.evaluate(() => localStorage.getItem('vate-sound-v1')),
-    audio: await page.evaluate(() => window.__audio.map((c) => c.state)),
-  });
+  const clickEmptySpace = async () => { await page.mouse.click(40, 500); await page.waitForTimeout(600); };
+  const soundState = () => page.evaluate(() => ({
+    pressed: document.querySelector('.lp button.sound')?.getAttribute('aria-pressed'),
+    saved: localStorage.getItem('vate-sound-v1'),
+    audio: window.__audio.map((a) => (a.ctx.state === 'closed' ? 'closed' : a.at >= window.__firstInput ? 'started on the first interaction' : 'started before any interaction')),
+  }));
   await openLanding();
+  await clickEmptySpace();
   let snd = await soundState();
-  check('landing: no audio exists until the visitor asks for it', snd.pressed === 'false' && snd.audio.length === 0, JSON.stringify(snd));
-  await sound.click();
-  await page.waitForTimeout(500);
-  snd = await soundState();
-  check('landing: the sound button starts the music and remembers the choice', snd.pressed === 'true' && snd.saved === '1' && snd.audio.length === 1 && snd.audio[0] !== 'closed', JSON.stringify(snd));
-  await openLanding();
-  await sound.click();
-  await page.waitForTimeout(500);
-  snd = await soundState();
-  check('landing: with the choice saved, a first click on the button itself keeps the music on', snd.pressed === 'true' && snd.saved === '1' && snd.audio.length === 1, JSON.stringify(snd));
+  check('landing: the music starts by itself with the first interaction, not before', snd.pressed === 'true' && snd.audio.length === 1 && snd.audio[0] === 'started on the first interaction' && snd.saved === null, JSON.stringify(snd));
   await sound.click();
   await page.waitForTimeout(300);
   snd = await soundState();
-  check('landing: switching the sound off forgets the choice', snd.pressed === 'false' && snd.saved === null, JSON.stringify(snd));
+  check('landing: the sound button switches it off and remembers that', snd.pressed === 'false' && snd.saved === '0', JSON.stringify(snd));
+  await openLanding();
+  await clickEmptySpace();
+  snd = await soundState();
+  check('landing: once switched off it stays silent on the next visit', snd.pressed === 'false' && snd.audio.length === 0 && snd.saved === '0', JSON.stringify(snd));
+  await sound.click();
+  await page.waitForTimeout(500);
+  snd = await soundState();
+  check('landing: the sound button switches it back on', snd.pressed === 'true' && snd.saved === '1' && snd.audio.length === 1, JSON.stringify(snd));
+  await openLanding();
+  await sound.click();
+  await page.waitForTimeout(500);
+  snd = await soundState();
+  check('landing: a first click on the sound button itself leaves the music on', snd.pressed === 'true' && snd.saved === '1' && snd.audio.length === 1, JSON.stringify(snd));
+
+  // landing page pointer (only with motion allowed, which also brings the intro)
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto(`${APP}/`, { waitUntil: 'networkidle' });
+  await page.locator('.lp .intro-enter.show').waitFor({ timeout: 20_000 });
+  await page.locator('.lp .intro').click();
+  await page.locator('.lp .intro').waitFor({ state: 'detached', timeout: 20_000 });
+  const ring = () => page.evaluate(() => {
+    const c = document.querySelector('.lp .cursor');
+    const style = getComputedStyle(c);
+    return { hover: c.classList.contains('hover'), width: style.width, filter: style.backdropFilter ?? style.webkitBackdropFilter ?? '' };
+  });
+  await page.mouse.move(40, 500, { steps: 5 });
+  await page.waitForTimeout(700);
+  const idle = await ring();
+  await page.locator('.lp a.launch').hover();
+  await page.waitForTimeout(700);
+  const over = await ring();
+  check('landing: over a button the pointer ring grows into the inverting lens', !idle.hover && idle.width === '34px' && over.hover && over.width === '64px' && /invert\(1\)/.test(over.filter), JSON.stringify({ idle, over }));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 
   check('no console or page errors during the run', problems.length === 0, problems.slice(0, 3).join(' | '));
   await browser.close();

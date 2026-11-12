@@ -90,8 +90,7 @@ function LandingInner() {
     if (!a) return;
     const on = a.set(!a.on);
     setSoundOn(on);
-    if (on) kv.set(storageKeys.sound, '1');
-    else kv.remove(storageKeys.sound);
+    kv.set(storageKeys.sound, on ? '1' : '0'); // '0' is what keeps the music from starting by itself next time
   }, []);
 
   const scrollTo = useCallback(
@@ -118,22 +117,43 @@ function LandingInner() {
     const sound = new Ambient();
     ambient.current = sound;
 
-    // A sound preference saved earlier is honoured on the first gesture (browsers require one).
-    // A gesture on the sound button itself is left to the button: handled here as well, the two
-    // would cancel out and the music would end up off.
-    if (kv.get(storageKeys.sound) === '1') {
-      const resume = (e: Event) => {
-        window.removeEventListener('pointerdown', resume);
-        window.removeEventListener('keydown', resume);
-        if (e.target instanceof Element && e.target.closest('button.sound')) return;
+    // The music plays unless the visitor has switched it off. A browser does not let a page make
+    // sound before the visitor has interacted with it, so it starts with the first click, tap or
+    // key press (usually "Click to enter"), or at once where the browser already allows it.
+    if (kv.get(storageKeys.sound) !== '0') {
+      const nav = navigator as Navigator & { userActivation?: { hasBeenActive: boolean }; getAutoplayPolicy?: (type: string) => string };
+      const interacted = () => nav.userActivation?.hasBeenActive === true;
+      const allowedAlready = () => {
+        try {
+          if (nav.getAutoplayPolicy?.('audiocontext') === 'allowed') return true;
+        } catch {
+          /* not every browser has this */
+        }
+        return interacted();
+      };
+      const start = () => {
         if (!sound.on) setSoundOn(sound.set(true));
       };
-      window.addEventListener('pointerdown', resume);
-      window.addEventListener('keydown', resume);
-      cleanups.push(() => {
-        window.removeEventListener('pointerdown', resume);
-        window.removeEventListener('keydown', resume);
-      });
+      if (allowedAlready()) {
+        start();
+      } else {
+        const events = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+        const disarm = () => events.forEach((type) => window.removeEventListener(type, first, true));
+        const first = (e: Event) => {
+          const target = e.target instanceof Element ? e.target : null;
+          // The sound button speaks for itself: starting here as well would cancel its click out.
+          if (target?.closest('button.sound')) return disarm();
+          // A link to another page: the visitor is leaving, so do not make them wait for audio to be built.
+          const href = target?.closest('a[href]')?.getAttribute('href');
+          if (href && !href.startsWith('#')) return;
+          // Not every event counts as an interaction: a touch does when the finger lifts, a scroll never.
+          if (nav.userActivation && !interacted()) return;
+          disarm();
+          start();
+        };
+        events.forEach((type) => window.addEventListener(type, first, true));
+        cleanups.push(disarm);
+      }
     }
 
     const stars = one<HTMLCanvasElement>('canvas.stars');

@@ -42,8 +42,8 @@ html.lp-locked, html.lp-locked body { overflow: hidden; height: 100vh; }
   /* ---- nav ------------------------------------------------------------------------------- */
   .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 80; display: flex; align-items: center; justify-content: space-between; padding: 20px var(--gut); background: linear-gradient(var(--bg) 20%, rgba(247, 250, 249, 0)); }
   .logo { width: 36px; height: 36px; color: var(--text-primary); display: block; }
-  .logo img { width: 100%; height: 100%; display: block; transition: transform 0.5s var(--ease); }
-  .logo:hover img { transform: scale(1.08); }
+  .logo img { width: 100%; height: 100%; display: block; transition: transform 0.8s var(--ease); }
+  .logo:hover img { transform: rotate(360deg); } /* a full turn: unlike the reference's mark, this one has a right way up */
   .links { display: flex; gap: 22px; }
   .links a { position: relative; display: flex; justify-content: space-between; align-items: center; width: 150px; padding: 6px 0; font: 500 12px/1 var(--f-d); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px dashed var(--border-strong); transition: color 0.3s; }
   .links a::after { content: ""; width: 5px; height: 5px; background: var(--text-muted); transition: background 0.3s, transform 0.4s; }
@@ -187,9 +187,16 @@ html.lp-locked, html.lp-locked body { overflow: hidden; height: 100vh; }
   .hud .n { font: 700 30px/1 var(--f-d); color: transparent; -webkit-text-stroke: 1px rgba(20, 45, 53, 0.7); }
   .hud .t { font: 500 10px/1.6 var(--f-m); letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); max-width: 46vw; }
   .hud .t b { color: var(--accent-hover); font-weight: 500; }
-  .cursor { position: fixed; left: 0; top: 0; z-index: 300; pointer-events: none; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 1px solid rgba(20, 45, 53, 0.55); border-radius: 50%; transition: width 0.3s, height 0.3s, margin 0.3s, background 0.3s, border-color 0.3s; opacity: 0; }
+  /* The pointer ring. Over anything clickable it grows into a lens that shows the page beneath in
+     negative. The reference does this on a dark page with mix-blend-mode: difference; on a light
+     page that turns the teal red, so this lens inverts and then turns the hue back. */
+  .cursor { position: fixed; left: 0; top: 0; z-index: 300; pointer-events: none; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 1px solid rgba(20, 45, 53, 0.55); border-radius: 50%; transition: width 0.3s, height 0.3s, margin 0.3s, background 0.3s, border-color 0.3s, -webkit-backdrop-filter 0.3s, backdrop-filter 0.3s; opacity: 0; }
   .cursor.live, .cursor-dot.live { opacity: 1; }
   .cursor.hover { width: 64px; height: 64px; margin: -32px 0 0 -32px; background: rgba(8, 127, 117, 0.12); border-color: var(--accent); }
+  @supports ((-webkit-backdrop-filter: invert(1)) or (backdrop-filter: invert(1))) {
+    .cursor { -webkit-backdrop-filter: invert(0) hue-rotate(0deg); backdrop-filter: invert(0) hue-rotate(0deg); }
+    .cursor.hover { background: transparent; border-color: transparent; -webkit-backdrop-filter: invert(1) hue-rotate(180deg); backdrop-filter: invert(1) hue-rotate(180deg); }
+  }
   .cursor-dot { position: fixed; left: 0; top: 0; z-index: 301; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--accent); pointer-events: none; opacity: 0; }
 }
 
