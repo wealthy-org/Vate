@@ -16,12 +16,15 @@ export function Modal({
   onClose,
   dismissible = true,
   title,
+  className,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   dismissible?: boolean;
   title: string;
+  /** Extra class for the box, for a dialog that is not the standard narrow one. */
+  className?: string;
   children: ReactNode;
 }) {
   const hydrated = useHydrated();
@@ -82,7 +85,7 @@ export function Modal({
         if (e.target === e.currentTarget && dismissible) onClose();
       }}
     >
-      <div className="mbox" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={box} tabIndex={-1}>
+      <div className={`mbox${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={box} tabIndex={-1}>
         {dismissible ? (
           <button className="close" type="button" onClick={onClose} aria-label="Close">
             ×
@@ -144,6 +147,13 @@ export const OrbitIcon = () => (
     <circle cx="20" cy="20" r="17" />
     <ellipse cx="20" cy="20" rx="17" ry="6.5" transform="rotate(-28 20 20)" />
     <circle cx="20" cy="20" r="3" />
+  </svg>
+);
+
+/** A card leaving its frame: the "share card" action. */
+export const ShareIcon = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9.5 2.5h4v4M13.5 2.5 8 8M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" />
   </svg>
 );
 

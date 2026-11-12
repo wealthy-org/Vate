@@ -201,6 +201,13 @@ export default function DocsPage() {
           whose shares changed outside this browser shows <em>incomplete</em>. Its value is still correct; only the cost basis is
           unknown here. Clearing the browser data removes this local history, not your position.
         </p>
+        <p>
+          <strong>Share card.</strong> Every position has a <em>Share</em> button that opens a card for it: the vault, its current
+          APY and, for a position opened through VATE in this browser, the tracked profit, the return in percent and how long it has
+          been held. You choose the headline figure, a bright or night style and a drawing, and you can leave the amounts, the time
+          held, the APY history or your wallet address off the card. The address is off unless you switch it on. Your choices are
+          kept in this browser; the card is not uploaded anywhere.
+        </p>
       </Section>
 
       <Section id="risks" n="08" title="Risks">

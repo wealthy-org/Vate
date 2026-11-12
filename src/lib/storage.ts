@@ -75,6 +75,8 @@ export const storageKeys = {
   /** Prefix used by the wallet connection layer (last used connector). */
   wallet: 'vate-wallet-v1',
   sound: 'vate-sound-v1',
+  /** How the share card was last set up (headline, style, drawing, what to include). */
+  card: 'vate-card-v1',
   activity: (chainId: number, account: string) => `vate-tx-${chainId}-${account.toLowerCase()}`,
   pending: (chainId: number, account: string) => `vate-pending-${chainId}-${account.toLowerCase()}`,
   ledger: (chainId: number, account: string, vault: string) =>

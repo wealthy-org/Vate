@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { VateApp } from '@/components/app/VateApp';
 import '@/styles/app.css';
+import '@/styles/share-card.css';
 
 export const metadata: Metadata = {
   title: 'App',
