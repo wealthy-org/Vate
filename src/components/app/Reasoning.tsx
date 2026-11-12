@@ -200,6 +200,11 @@ const ICONS: Record<Insight['kind'], React.ReactNode> = {
       <path d="M3 6l4 4 3-3 5 6" /><path d="M11 13h4V9" />
     </svg>
   ),
+  flat: (
+    <svg className="ic flat" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M3 9h12" />
+    </svg>
+  ),
   rewards: (
     <svg className="ic" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
       <circle cx="8" cy="8" r="5" /><path d="M12 12l4 4" />

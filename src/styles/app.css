@@ -41,8 +41,8 @@
     border-bottom: 1px solid var(--border);
   }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; }
-  .brand svg { width: 30px; height: 30px; }
-  .brand:hover svg { animation: vate-spin 2s var(--ease); }
+  .brand img { width: 30px; height: 30px; display: block; transition: transform 0.5s var(--ease); }
+  .brand:hover img { transform: scale(1.08); }
   .tabs { display: flex; gap: 4px; margin-left: 18px; padding: 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-muted); }
   .tabs button { padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); transition: all 0.3s; }
   .tabs button:hover { color: var(--text-primary); }
@@ -217,7 +217,7 @@
   .kep-verdict { font-family: var(--f-s); font-style: italic; font-size: clamp(17px, 1.5vw, 21px); line-height: 1.4; min-height: 3em; color: var(--text-primary); }
   .kep-verdict .cur { display: inline-block; width: 2px; height: 1em; background: var(--accent); vertical-align: -2px; margin-left: 2px; animation: vate-pulse 1s infinite; }
   .kep-verdict.muted { color: var(--text-secondary); }
-  .kep-head, .kep-row { display: grid; grid-template-columns: 22px minmax(104px, 1.25fr) minmax(52px, 0.62fr) repeat(2, minmax(96px, 1fr)) 80px; gap: 12px; align-items: center; }
+  .kep-head, .kep-row { display: grid; grid-template-columns: 22px minmax(104px, 1.25fr) minmax(52px, 0.62fr) repeat(2, minmax(112px, 1fr)) 80px; gap: 12px; align-items: center; }
   .kep-head { margin-top: 20px; padding: 0 6px 10px; border-bottom: 1px solid var(--border); }
   .kep-row { padding: 12px 6px; border-bottom: 1px solid var(--border); text-align: left; width: 100%; border-radius: 8px; transition: background 0.3s, opacity 0.5s, transform 0.5s var(--ease); }
   .kep-row:hover { background: rgba(var(--ink-rgb), 0.035); }
@@ -245,6 +245,7 @@
   .feed li:last-child { border-bottom: 0; }
   .feed .ic { width: 18px; height: 18px; color: var(--accent); }
   .feed .ic.dn { color: var(--warning); }
+  .feed .ic.flat { color: var(--text-muted); }
   .feed .tag { font: 500 11px/1 var(--f-m); color: var(--text-muted); text-align: right; white-space: nowrap; }
 
   /* ---- portfolio ------------------------------------------------------------------------- */
@@ -340,12 +341,13 @@
   .va .act { grid-column: 1 / -1; }
   .va .kv { grid-template-columns: repeat(2, auto); }
 }
-@container kep (max-width: 560px) {
+/* The table needs 112px per factor column ("×0.97 · $540.0M" is 105px); below that it stacks. */
+@container kep (max-width: 640px) {
   .va .kep-head { display: none; }
   .va .kep-row { grid-template-columns: 22px 1fr 80px; row-gap: 9px; }
   .va .kep-row .fac { grid-column: 2 / 4; flex-direction: row; align-items: center; gap: 10px; }
   .va .kep-row .fac em { display: block; width: 66px; flex: none; }
-  .va .kep-row .fac b { width: 104px; flex: none; }
+  .va .kep-row .fac b { width: 112px; flex: none; }
   .va .kep-row .fac i { flex: 1; }
   .va .kep-row .sc { grid-column: 3; grid-row: 1; }
 }

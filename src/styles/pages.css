@@ -11,8 +11,8 @@
 
   .dp-header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 22px; padding: 16px var(--gut); background: rgba(247, 250, 249, 0.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; }
-  .brand svg { width: 30px; height: 30px; }
-  .brand:hover svg { animation: vate-spin 2s var(--ease); }
+  .brand img { width: 30px; height: 30px; display: block; transition: transform 0.5s var(--ease); }
+  .brand:hover img { transform: scale(1.08); }
   .dp-header nav { display: flex; gap: 22px; margin-left: auto; }
   .dp-header nav a { font: 500 12px/1 var(--f-d); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); transition: color 0.3s; padding: 6px 0; }
   .dp-header nav a:hover, .dp-header nav a[aria-current="page"] { color: var(--text-primary); }

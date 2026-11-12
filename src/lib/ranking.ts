@@ -92,7 +92,7 @@ export function buildReasoning(ranking: Ranking): string | null {
   return text;
 }
 
-export type InsightKind = 'pick' | 'up' | 'down' | 'rewards' | 'liquidity';
+export type InsightKind = 'pick' | 'up' | 'down' | 'flat' | 'rewards' | 'liquidity';
 
 export interface Insight {
   id: string;
@@ -140,14 +140,19 @@ export function buildInsights(ranking: Ranking, now: number): Insight[] {
 
     const d1 = sameSeries ? pointAtOrBefore(m.history, now - 24 * HOUR, 36 * HOUR) : null;
     if (d1) {
-      const change = m.apy - d1.apy;
+      // Compared at the two decimals that are displayed, so the sentence, the two figures and
+      // the tag always agree (never "rose from 7.00% to 7.00%").
+      const change = Number(m.apy.toFixed(2)) - Number(d1.apy.toFixed(2));
+      const flat = Math.abs(change) < 0.005;
       items.push({
         id: `apy-${m.address}`,
-        kind: change >= 0 ? 'up' : 'down',
+        kind: flat ? 'flat' : change > 0 ? 'up' : 'down',
         vault: m.address,
         lead: null,
-        text: `${m.name} APY ${change >= 0 ? 'rose' : 'fell'} from ${fmtPct(d1.apy)} to ${fmtPct(m.apy)} in the last 24h.`,
-        tag: `${fmtSigned(change)} pts`,
+        text: flat
+          ? `${m.name} APY is unchanged at ${fmtPct(m.apy)} compared with 24h ago.`
+          : `${m.name} APY ${change > 0 ? 'rose' : 'fell'} from ${fmtPct(d1.apy)} to ${fmtPct(m.apy)} in the last 24h.`,
+        tag: flat ? '0.00 pts' : `${fmtSigned(change)} pts`,
       });
     }
 

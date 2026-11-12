@@ -168,6 +168,13 @@ body {
 .ca:hover {
   border-color: rgba(var(--accent-rgb), 0.55);
 }
+@media (max-width: 380px) {
+  /* Keeps "Contract pending" whole next to the tag, copy and explorer buttons at 360px. */
+  .ca {
+    gap: 6px;
+    padding-left: 11px;
+  }
+}
 .ca-tag {
   flex: none;
   color: var(--accent-hover);

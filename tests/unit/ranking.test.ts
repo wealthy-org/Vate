@@ -204,6 +204,26 @@ describe('buildInsights', () => {
     expect(items.find((i) => i.kind === 'down')).toMatchObject({ tag: '−0.50 pts' });
   });
 
+  it('calls a 24h move that is invisible at two decimals unchanged, never "rose from 7.00% to 7.00%"', () => {
+    for (const before of [7, 7.004, 6.996]) {
+      const m = market(A, 'Alpha', { apy: 7.001, history: [pt(25, before), pt(1, 7.001)] });
+      const item = buildInsights(rankVaults([m], checks([[A, 'verified']])), now).find((i) => i.id.startsWith('apy-'));
+      expect(item).toMatchObject({ kind: 'flat', tag: '0.00 pts' });
+      expect(item?.text).toBe('Alpha APY is unchanged at 7.00% compared with 24h ago.');
+    }
+  });
+
+  it('keeps the sentence, both figures and the tag consistent at the rounding edge', () => {
+    const up = market(A, 'Alpha', { apy: 6.996, history: [pt(25, 6.994), pt(1, 6.996)] });
+    const item = buildInsights(rankVaults([up], checks([[A, 'verified']])), now).find((i) => i.id.startsWith('apy-'));
+    expect(item).toMatchObject({ kind: 'up', tag: '+0.01 pts' });
+    expect(item?.text).toContain('rose from 6.99% to 7.00%');
+    const down = market(A, 'Alpha', { apy: 6.994, history: [pt(25, 6.996), pt(1, 6.994)] });
+    const fell = buildInsights(rankVaults([down], checks([[A, 'verified']])), now).find((i) => i.id.startsWith('apy-'));
+    expect(fell).toMatchObject({ kind: 'down', tag: '−0.01 pts' });
+    expect(fell?.text).toContain('fell from 7.00% to 6.99%');
+  });
+
   it('invents nothing when history is missing, too old, or from another source', () => {
     const none = buildInsights(rankVaults([market(A, 'Alpha')], checks([[A, 'verified']])), now);
     expect(none.map((i) => i.kind)).toEqual(['pick']);

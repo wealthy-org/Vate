@@ -42,8 +42,8 @@ html.lp-locked, html.lp-locked body { overflow: hidden; height: 100vh; }
   /* ---- nav ------------------------------------------------------------------------------- */
   .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 80; display: flex; align-items: center; justify-content: space-between; padding: 20px var(--gut); background: linear-gradient(var(--bg) 20%, rgba(247, 250, 249, 0)); }
   .logo { width: 36px; height: 36px; color: var(--text-primary); display: block; }
-  .logo svg { width: 100%; height: 100%; transition: transform 0.8s var(--ease); }
-  .logo:hover svg { transform: rotate(180deg); }
+  .logo img { width: 100%; height: 100%; display: block; transition: transform 0.5s var(--ease); }
+  .logo:hover img { transform: scale(1.08); }
   .links { display: flex; gap: 22px; }
   .links a { position: relative; display: flex; justify-content: space-between; align-items: center; width: 150px; padding: 6px 0; font: 500 12px/1 var(--f-d); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px dashed var(--border-strong); transition: color 0.3s; }
   .links a::after { content: ""; width: 5px; height: 5px; background: var(--text-muted); transition: background 0.3s, transform 0.4s; }
