@@ -119,10 +119,13 @@ function LandingInner() {
     ambient.current = sound;
 
     // A sound preference saved earlier is honoured on the first gesture (browsers require one).
+    // A gesture on the sound button itself is left to the button: handled here as well, the two
+    // would cancel out and the music would end up off.
     if (kv.get(storageKeys.sound) === '1') {
-      const resume = () => {
+      const resume = (e: Event) => {
         window.removeEventListener('pointerdown', resume);
         window.removeEventListener('keydown', resume);
+        if (e.target instanceof Element && e.target.closest('button.sound')) return;
         if (!sound.on) setSoundOn(sound.set(true));
       };
       window.addEventListener('pointerdown', resume);

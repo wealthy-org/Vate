@@ -139,10 +139,20 @@ export function devWallet(anvil: Anvil, key: Hex): TestWallet {
   return wallet;
 }
 
-/** Deploys the VATE testnet fixture through the CREATE2 deployer and returns the receipt. */
+/**
+ * Deploys the VATE testnet fixture through the CREATE2 deployer and returns the receipt.
+ *
+ * The fixture is live on the real testnet, so a fork already contains it, in whatever state its
+ * users have left it. Its accounts are emptied first; the deployment then recreates every contract
+ * at the same address with fresh storage, so tests start from the same state every time.
+ */
 export async function deployFixture(anvil: Anvil, key: Hex) {
   const path = fileURLToPath(new URL('../../src/config/testnet-fixture.initcode.json', import.meta.url));
   const { initCode } = JSON.parse(readFileSync(path, 'utf8')) as { initCode: Hex };
+  for (const address of [FIXTURE.deployment, FIXTURE.usdg, ...FIXTURE.vaults.flatMap((v) => [v.address, v.marketAdapter])]) {
+    await anvil.test.setCode({ address, bytecode: '0x' });
+    await anvil.test.setNonce({ address, nonce: 0 });
+  }
   const account = privateKeyToAccount(key);
   const client = createWalletClient({ account, chain: anvil.chain, transport: http(anvil.url) });
   const hash = await client.sendTransaction({ to: FIXTURE.create2Factory, data: fixtureDeployData(initCode) });

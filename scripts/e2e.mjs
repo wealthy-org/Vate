@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // End-to-end check of the real UI in a real browser, without touching any live network:
-//   1. forks Robinhood Chain Testnet locally with Anvil and deploys the VATE test fixture,
+//   1. forks Robinhood Chain Testnet locally with Anvil and deploys a fresh copy of the VATE test fixture,
 //   2. builds and serves the app pointed at that fork (separate build dir: .next-e2e),
 //   3. injects an EIP-6963 test wallet backed by an Anvil dev account,
 //   4. walks through connect, faucet, deposit, rejection, portfolio, partial withdraw, MAX,
-//      the no-adapter liquidity cap, wrong network, reload/reconnect and disconnect.
+//      the no-adapter liquidity cap, wrong network, reload/reconnect and disconnect,
+//   5. checks the landing page's sound button: silent until asked, remembered, switched off again.
 // Requires Foundry (anvil) and Playwright's Chromium (pnpm exec playwright install chromium).   pnpm test:e2e
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { concatHex, createPublicClient, createWalletClient, defineChain, http } from 'viem';
+import { concatHex, createPublicClient, createTestClient, createWalletClient, defineChain, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -130,6 +131,14 @@ async function main() {
   const chain = defineChain({ id: 46630, name: 'fork', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
   const pub = createPublicClient({ chain, transport: http(RPC) });
   const deployer = createWalletClient({ chain, transport: http(RPC), account: privateKeyToAccount(DEPLOYER_KEY) });
+  // The fixture is live on the real testnet, so the fork already contains it, in whatever state
+  // its users have left it. Empty its accounts first: the deployment then recreates every contract
+  // at the same address with fresh storage, and the run starts from the same state every time.
+  const node = createTestClient({ chain, mode: 'anvil', transport: http(RPC) });
+  for (const address of [fixture.deployment, fixture.usdg, ...fixture.vaults.flatMap((v) => [v.address, v.marketAdapter])]) {
+    await node.setCode({ address, bytecode: '0x' });
+    await node.setNonce({ address, nonce: 0 });
+  }
   const hash = await deployer.sendTransaction({ to: fixture.create2Factory, data: concatHex([fixture.salt, initCode]) });
   const receipt = await pub.waitForTransactionReceipt({ hash });
   check('fixture deployed on the local fork', receipt.status === 'success', `${receipt.gasUsed} gas`);
@@ -301,6 +310,41 @@ async function main() {
   await page.locator('.acct-menu button', { hasText: 'Disconnect' }).click();
   await page.locator('.btn.wallet', { hasText: 'Connect wallet' }).waitFor({ timeout: 10_000 });
   check('disconnect returns to the read-only state', (await cta.textContent()) === 'Connect wallet');
+
+  // landing page sound (the notes themselves are covered by tests/unit/score.test.ts)
+  await page.addInitScript(() => {
+    window.__audio = [];
+    const Real = window.AudioContext;
+    if (Real) window.AudioContext = class extends Real { constructor(...args) { super(...args); window.__audio.push(this); } };
+  });
+  const sound = page.locator('.lp button.sound');
+  const openLanding = async () => {
+    await page.goto(`${APP}/`, { waitUntil: 'domcontentloaded' });
+    // React marks the nodes it has taken over; a click before that would reach nothing.
+    await page.waitForFunction(() => { const b = document.querySelector('.lp button.sound'); return !!b && Object.keys(b).some((k) => k.startsWith('__reactProps')); }, null, { timeout: 30_000 });
+    await page.waitForTimeout(300);
+  };
+  const soundState = async () => ({
+    pressed: await sound.getAttribute('aria-pressed'),
+    saved: await page.evaluate(() => localStorage.getItem('vate-sound-v1')),
+    audio: await page.evaluate(() => window.__audio.map((c) => c.state)),
+  });
+  await openLanding();
+  let snd = await soundState();
+  check('landing: no audio exists until the visitor asks for it', snd.pressed === 'false' && snd.audio.length === 0, JSON.stringify(snd));
+  await sound.click();
+  await page.waitForTimeout(500);
+  snd = await soundState();
+  check('landing: the sound button starts the music and remembers the choice', snd.pressed === 'true' && snd.saved === '1' && snd.audio.length === 1 && snd.audio[0] !== 'closed', JSON.stringify(snd));
+  await openLanding();
+  await sound.click();
+  await page.waitForTimeout(500);
+  snd = await soundState();
+  check('landing: with the choice saved, a first click on the button itself keeps the music on', snd.pressed === 'true' && snd.saved === '1' && snd.audio.length === 1, JSON.stringify(snd));
+  await sound.click();
+  await page.waitForTimeout(300);
+  snd = await soundState();
+  check('landing: switching the sound off forgets the choice', snd.pressed === 'false' && snd.saved === null, JSON.stringify(snd));
 
   check('no console or page errors during the run', problems.length === 0, problems.slice(0, 3).join(' | '));
   await browser.close();
