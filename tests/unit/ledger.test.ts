@@ -68,6 +68,31 @@ describe('vault ledger and tracked profit', () => {
     expect(l.shares).toBe('0');
     expect(l.incomplete).toBe(true);
   });
+
+  it('remembers when the open position started, through later transactions and until it is reopened', () => {
+    let l = applyToLedger(null, deposit(100n * U, 100n * S, 0n, 1_000));
+    expect(l.openedAt).toBe(1_000);
+    l = applyToLedger(l, deposit(50n * U, 50n * S, 100n * S, 2_000));
+    l = applyToLedger(l, withdraw(150n * U, 150n * S, 150n * S, 3_000));
+    expect(l).toMatchObject({ shares: '0', openedAt: 1_000, updatedAt: 3_000 });
+    l = applyToLedger(l, deposit(70n * U, 70n * S, 0n, 4_000));
+    expect(l).toMatchObject({ deposited: (70n * U).toString(), withdrawn: '0', txCount: 1, openedAt: 4_000 });
+  });
+
+  it('does not guess a start for a position that already existed', () => {
+    // Shares were there before the first transaction made here, or the balance before it is unknown.
+    expect(applyToLedger(null, deposit(100n * U, 100n * S, 700n * S, 1_000)).openedAt).toBeUndefined();
+    expect(applyToLedger(null, deposit(100n * U, 100n * S, null, 1_000)).openedAt).toBeUndefined();
+  });
+
+  it('carries on from a ledger rebuilt from the chain', () => {
+    // What src/lib/chain/history.ts produces for a position opened somewhere else.
+    const fromChain = { deposited: (9000n * U).toString(), withdrawn: '0', shares: (9000n * S).toString(), incomplete: false, txCount: 1, updatedAt: 500, openedAt: 500 };
+    expect(trackedProfit(fromChain, 9000n * S, 9000n * U + 62_791n)).toEqual({ status: 'tracked', profit: 62_791n });
+    const l = applyToLedger(fromChain, withdraw(1000n * U, 999n * S, 9000n * S, 2_000));
+    expect(l).toMatchObject({ withdrawn: (1000n * U).toString(), shares: (8001n * S).toString(), incomplete: false, txCount: 2, openedAt: 500 });
+    expect(trackedProfit(l, 8001n * S, 8003n * U)).toEqual({ status: 'tracked', profit: 3n * U });
+  });
 });
 
 describe('TxStore (per chain + wallet)', () => {
@@ -164,6 +189,19 @@ describe('TxStore (per chain + wallet)', () => {
     expect(new TxStore(46630, ACCOUNT).activity()).toEqual([]);
     kv.set(storageKeys.ledger(46630, ACCOUNT, VAULT), JSON.stringify({ deposited: '1e9', withdrawn: '0', shares: '0' }));
     expect(new TxStore(46630, ACCOUNT).ledger(VAULT)).toBeNull();
+    // A start time that is not a time is dropped; the rest of the ledger is kept.
+    kv.set(storageKeys.ledger(46630, ACCOUNT, VAULT), JSON.stringify({ deposited: '5', withdrawn: '0', shares: '5', openedAt: 'yesterday' }));
+    expect(new TxStore(46630, ACCOUNT).ledger(VAULT)).toEqual({ deposited: '5', withdrawn: '0', shares: '5', incomplete: false, txCount: 0, updatedAt: 0 });
+  });
+
+  it('adopts a ledger rebuilt from the chain, and the next transaction made here continues it', () => {
+    const s = new TxStore(46630, ACCOUNT);
+    const fromChain = { deposited: (9000n * U).toString(), withdrawn: '0', shares: (9000n * S).toString(), incomplete: false, txCount: 1, updatedAt: 500, openedAt: 500 };
+    s.adoptLedger(VAULT, fromChain);
+    expect(s.ledger(VAULT)).toEqual(fromChain);
+    expect(new TxStore(4663, ACCOUNT).ledger(VAULT)).toBeNull(); // another chain is another ledger
+    s.recordConfirmed(record(1, { assets: (10n * U).toString(), shares: (10n * S).toString() }), 9000n * S);
+    expect(s.ledger(VAULT)).toMatchObject({ deposited: (9010n * U).toString(), shares: (9010n * S).toString(), incomplete: false, txCount: 2, openedAt: 500 });
   });
 
   it('stores the risk acknowledgement under the versioned key', () => {

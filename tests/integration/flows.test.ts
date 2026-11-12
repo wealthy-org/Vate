@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TEST_USDG_ABI, TEST_VAULT_ABI } from '@/abi/testnet.generated';
 import { ERC20_ABI, VAULT_V2_ABI } from '@/abi/vaultV2';
 import { NETWORKS, type VaultConfig } from '@/config/networks';
+import { readPositionHistory } from '@/lib/chain/history';
 import { readVaultChecks, readWallet } from '@/lib/chain/reads';
 import { loadFixtureSnapshot } from '@/lib/data/fixture';
 import { fixtureStatus } from '@/lib/fixture-deploy';
@@ -458,6 +459,90 @@ describe('portfolio reads and tracking', () => {
     const snap = await readWallet(anvil.publicClient, anvil.network, empty);
     expect(snap).toMatchObject({ eth: 0n, assetBalance: 0n, partial: false });
     expect(Object.values(snap.vaults).every((v) => v.shares === 0n && v.assets === 0n && v.allowance === 0n)).toBe(true);
+  });
+});
+
+describe('position history read back from the chain', () => {
+  // The fork has a few minutes of blocks of its own; a short stretch keeps the search local.
+  const near = { span: 5_000n, maxWindows: 2 } as const;
+  const depositData = (amount: bigint, onBehalf: Address) => encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'deposit', args: [amount, onBehalf] });
+  const blockTime = async (blockNumber: bigint) => Number((await anvil.publicClient.getBlock({ blockNumber })).timestamp) * 1000;
+
+  it('rebuilds the ledger of a position this browser never saw: opened from a script, grown, partly withdrawn', async () => {
+    const wallet = await freshWallet();
+    // No executor and no TxStore: plain transactions, as a script or another device would send them.
+    await send(wallet, token, approveData(vaultI.address, 3_000n * U));
+    const first = await send(wallet, vaultI.address, depositData(2_000n * U, wallet.address));
+    await send(wallet, vaultI.address, depositData(1_000n * U, wallet.address));
+    const last = await send(wallet, vaultI.address, encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'withdraw', args: [500n * U, wallet.address, wallet.address] }));
+    const store = new TxStore(anvil.network.chain.id, wallet.address);
+    const state = (await readWallet(anvil.publicClient, anvil.network, wallet.address)).vaults[vaultI.address.toLowerCase()]!;
+    expect(trackedProfit(store.ledger(vaultI.address), state.shares, state.assets)).toEqual({ status: 'not-tracked' });
+
+    const ledger = await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: wallet.address, shares: state.shares, ...near });
+    expect(ledger).toEqual({
+      deposited: (3_000n * U).toString(),
+      withdrawn: (500n * U).toString(),
+      shares: state.shares.toString(),
+      incomplete: false,
+      txCount: 3,
+      openedAt: await blockTime(first.blockNumber),
+      updatedAt: await blockTime(last.blockNumber),
+    });
+    store.adoptLedger(vaultI.address, ledger!);
+    const profit = trackedProfit(store.ledger(vaultI.address), state.shares, state.assets);
+    expect(profit.status).toBe('tracked');
+    // 2,500 left in a vault paying a few percent a year, seconds after the deposits: within a cent of zero.
+    expect(profit.status === 'tracked' && profit.profit >= -3n && profit.profit < U / 100n).toBe(true);
+
+    // A withdrawal made here afterwards carries on from the adopted ledger.
+    const h = harness(wallet, wallet.address);
+    const out = await executeWithdraw(h.ctx, { vault: vaultI, vaultName: 'Vault I', amount: 100n * U, redeemAll: false });
+    expect(out.status).toBe('success');
+    const after = (await readWallet(anvil.publicClient, anvil.network, wallet.address)).vaults[vaultI.address.toLowerCase()]!;
+    expect(h.store.ledger(vaultI.address)).toMatchObject({ withdrawn: (600n * U).toString(), shares: after.shares.toString(), incomplete: false, txCount: 4, openedAt: ledger!.openedAt });
+    expect(trackedProfit(h.store.ledger(vaultI.address), after.shares, after.assets).status).toBe('tracked');
+    // ...and the chain agrees with what this browser now has.
+    expect(await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: wallet.address, shares: after.shares, ...near })).toMatchObject({ deposited: (3_000n * U).toString(), withdrawn: (600n * U).toString(), txCount: 4, openedAt: ledger!.openedAt });
+  });
+
+  it('starts again at the deposit that reopened a closed position', async () => {
+    const wallet = await freshWallet();
+    await send(wallet, token, approveData(vaultIII.address, 1_000n * U));
+    await send(wallet, vaultIII.address, depositData(700n * U, wallet.address));
+    const all = await read.shares(vaultIII.address, wallet.address);
+    await send(wallet, vaultIII.address, encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'redeem', args: [all, wallet.address, wallet.address] }));
+    const reopened = await send(wallet, vaultIII.address, depositData(250n * U, wallet.address));
+    const shares = await read.shares(vaultIII.address, wallet.address);
+    expect(await readPositionHistory(anvil.publicClient, { vault: vaultIII.address, account: wallet.address, shares, ...near })).toMatchObject({
+      deposited: (250n * U).toString(),
+      withdrawn: '0',
+      txCount: 1,
+      openedAt: await blockTime(reopened.blockNumber),
+    });
+  });
+
+  it('does not invent a cost basis for shares that were transferred', async () => {
+    const sender = await freshWallet();
+    const receiver = await freshWallet(false);
+    await send(sender, token, approveData(vaultI.address, 1_000n * U));
+    await send(sender, vaultI.address, depositData(1_000n * U, sender.address));
+    const minted = await read.shares(vaultI.address, sender.address);
+    await send(sender, vaultI.address, encodeFunctionData({ abi: TEST_VAULT_ABI, functionName: 'transfer', args: [receiver.address, minted / 4n] }));
+    // The receiver never deposited: nothing explains its shares. The sender deposited more than it still holds.
+    expect(await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: receiver.address, shares: minted / 4n, ...near })).toBeNull();
+    expect(await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: sender.address, shares: minted - minted / 4n, ...near })).toBeNull();
+  });
+
+  it('counts a deposit made for the wallet by someone else, and only for that wallet', async () => {
+    const payer = await freshWallet();
+    const owner = await freshWallet(false);
+    await send(payer, token, approveData(vaultI.address, 400n * U));
+    await send(payer, vaultI.address, depositData(400n * U, owner.address));
+    const shares = await read.shares(vaultI.address, owner.address);
+    expect(shares > 0n).toBe(true);
+    expect(await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: owner.address, shares, ...near })).toMatchObject({ deposited: (400n * U).toString(), txCount: 1 });
+    expect(await read.shares(vaultI.address, payer.address)).toBe(0n);
   });
 });
 

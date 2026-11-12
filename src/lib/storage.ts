@@ -140,6 +140,7 @@ function toLedger(v: unknown): VaultLedger | null {
     incomplete: v.incomplete === true,
     txCount: typeof v.txCount === 'number' && v.txCount >= 0 ? Math.floor(v.txCount) : 0,
     updatedAt: isTime(v.updatedAt) ? v.updatedAt : 0,
+    ...(isTime(v.openedAt) ? { openedAt: v.openedAt } : {}),
   };
 }
 
@@ -165,7 +166,7 @@ export function applyToLedger(
   let ledger: VaultLedger = previous ? { ...previous } : { ...EMPTY_LEDGER };
   if (entry.sharesBefore !== null) {
     if (entry.sharesBefore === 0n && entry.kind === 'deposit') {
-      ledger = { ...EMPTY_LEDGER }; // a fresh position: new tracking period
+      ledger = { ...EMPTY_LEDGER, openedAt: entry.ts }; // a fresh position: new tracking period
     } else if (entry.sharesBefore !== BigInt(ledger.shares)) {
       ledger.incomplete = true;
     }
@@ -227,6 +228,14 @@ export class TxStore {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Replaces a vault's ledger with one rebuilt from the chain (src/lib/chain/history.ts), for a
+   * position this browser has no complete record of. Later transactions made here carry on from it.
+   */
+  adoptLedger(vault: string, ledger: VaultLedger): void {
+    kv.set(storageKeys.ledger(this.chainId, this.account, vault), JSON.stringify(ledger));
   }
 
   private writePending(list: PendingRecord[]) {

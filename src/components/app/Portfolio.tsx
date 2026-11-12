@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Address } from 'viem';
 import { explorerAddress, explorerTx, findVault, NETWORK } from '@/config/networks';
+import { useChainHistory } from '@/hooks/useWallet';
 import type { WalletSnapshot } from '@/lib/chain/reads';
 import { fmtDateTime, fmtPct, fmtUsd, shortAddress } from '@/lib/format';
 import { summarizePortfolio } from '@/lib/portfolio';
@@ -52,6 +53,8 @@ export function PortfolioView({
     : [];
   const summary = summarizePortfolio(rows.map((x) => ({ assets: x.state!.assets, apy: x.v.market.apy })), DECIMALS);
   const ready = account != null && wallet != null;
+  // Positions this browser has no record of get their deposits and withdrawals from the chain.
+  const history = useChainHistory(account, wallet, store);
   // The position whose share card is open. It closes by itself if the position is gone.
   const [shareFor, setShareFor] = useState<Address | null>(null);
   const shared = shareFor ? rows.find((x) => x.v.market.address === shareFor) : undefined;
@@ -70,7 +73,7 @@ export function PortfolioView({
       assets: state.assets,
       profit: trackedProfit(ledger, state.shares, state.assets),
       ledger,
-      openedAt: positionOpenedAt(ledger, activity, v.market.address),
+      openedAt: ledger?.openedAt ?? positionOpenedAt(ledger, activity, v.market.address),
       account,
       history: v.market.history,
     };
@@ -81,8 +84,8 @@ export function PortfolioView({
     <section className="view pf" aria-labelledby="pf-title">
       <h1 className="title" id="pf-title">Your <em>portfolio</em></h1>
       <p className="sub">
-        Read directly from the vault contracts for your connected address. Profit is calculated from deposits and withdrawals made in
-        this app on this browser.
+        Read directly from the vault contracts for your connected address. Profit is what a position is worth now against what you
+        deposited and withdrew, taken from this browser&rsquo;s record or read back from the chain.
       </p>
 
       <div className="pf-top">
@@ -154,10 +157,12 @@ export function PortfolioView({
                     <td role="cell" data-label="PROFIT (TRACKED)">
                       {profit.status === 'tracked' ? (
                         <ProfitCell value={profit.profit} />
+                      ) : history.reading.has(v.market.address.toLowerCase()) ? (
+                        <span className="muted-t" title="Reading this position's deposits and withdrawals from the chain.">reading…</span>
                       ) : profit.status === 'incomplete' ? (
-                        <span className="muted-t" title="Part of this position was deposited, withdrawn or transferred outside this browser, so its cost basis is not known here.">incomplete</span>
+                        <span className="muted-t" title="This browser's record does not match the shares you hold, and the deposits and withdrawals on the chain do not explain them either (shares moved by a transfer, or the node could not be asked). Its cost basis is not known.">incomplete</span>
                       ) : (
-                        <span className="muted-t" title="This position was not opened through VATE in this browser, so its cost basis is not known here.">not tracked</span>
+                        <span className="muted-t" title="The deposits behind this position could not be worked out from the chain (shares received by a transfer, a position older than the search goes back, or the node could not be asked). Its cost basis is not known.">not tracked</span>
                       )}
                     </td>
                     <td role="cell" data-label="APY">{v.market.apy == null ? <Unknown /> : fmtPct(v.market.apy)}</td>

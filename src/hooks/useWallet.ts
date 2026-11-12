@@ -1,14 +1,15 @@
 'use client';
 
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { createWalletClient, custom, type Address, type EIP1193Provider } from 'viem';
 import { useConnection, useConnectors, useConnect, useDisconnect, useSwitchChain, type Connector } from 'wagmi';
 import { NETWORK } from '@/config/networks';
 import { REFRESH } from '@/config/site';
 import { getPublicClient } from '@/lib/chain/client';
+import { readPositionHistory } from '@/lib/chain/history';
 import { readWallet, type WalletSnapshot } from '@/lib/chain/reads';
-import { storageStore, TxStore } from '@/lib/storage';
+import { storageStore, trackedProfit, TxStore } from '@/lib/storage';
 import { walletPortFromClient, type WalletPort } from '@/lib/tx/execute';
 import { reconcilePending, type Reconciled } from '@/lib/tx/reconcile';
 
@@ -102,6 +103,48 @@ export function useTxStore(account: Address | null) {
     }),
     [store, version],
   );
+}
+
+/**
+ * For every position this browser has no complete record of (opened on another device, from a
+ * script, or before the site data was cleared), reads its deposits and withdrawals back from the
+ * chain and adopts the result as the vault's ledger. Profit and time held then work for it like
+ * for a position opened here. Returns the vaults still being read.
+ */
+export function useChainHistory(account: Address | null, wallet: WalletSnapshot | undefined, store: TxStore | null) {
+  // A ledger adopted below, or a transaction recorded here, changes which positions are left.
+  const version = useSyncExternalStore(storageStore.subscribe, storageStore.getSnapshot, storageStore.getServerSnapshot);
+  const targets = useMemo(() => {
+    if (!account || !store || !wallet || wallet.account.toLowerCase() !== account.toLowerCase()) return [];
+    return NETWORK.vaults.flatMap((v) => {
+      const state = wallet.vaults[v.address.toLowerCase()];
+      if (!state || state.shares <= 0n) return [];
+      const known = trackedProfit(store.ledger(v.address), state.shares, state.assets).status === 'tracked';
+      return known ? [] : [{ vault: v.address, shares: state.shares }];
+    });
+    // `version` is the dependency that matters: the ledgers are read from storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, store, wallet, version]);
+
+  const results = useQueries({
+    queries: targets.map((t) => ({
+      // The share balance is part of the key: the same balance has the same history.
+      queryKey: ['history', NETWORK.key, (account as Address).toLowerCase(), t.vault.toLowerCase(), t.shares.toString()],
+      queryFn: async () => {
+        const ledger = await readPositionHistory(getPublicClient(), { vault: t.vault, account: account as Address, shares: t.shares });
+        if (ledger) (store as TxStore).adoptLedger(t.vault, ledger);
+        return ledger != null;
+      },
+      staleTime: Infinity,
+      gcTime: 30 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    })),
+  });
+
+  const reading = targets.filter((_, i) => results[i]?.isPending).map((t) => t.vault.toLowerCase()).join(',');
+  return useMemo(() => ({ reading: new Set(reading ? reading.split(',') : []) }), [reading]);
 }
 
 /**

@@ -120,7 +120,11 @@ export interface PendingRecord {
   status: 'pending' | 'unknown';
 }
 
-/** Running totals for one chain + wallet + vault, used for "Profit (tracked)". */
+/**
+ * Running totals for one chain + wallet + vault, used for "Profit (tracked)". Kept up to date by
+ * the transactions made in this browser, and rebuilt from the vault's event log when those do
+ * not explain the position (src/lib/chain/history.ts).
+ */
 export interface VaultLedger {
   deposited: string;
   withdrawn: string;
@@ -130,6 +134,8 @@ export interface VaultLedger {
   incomplete: boolean;
   txCount: number;
   updatedAt: number;
+  /** When the open position started (ms): the deposit made while the wallet held no shares. */
+  openedAt?: number;
 }
 
 export interface WalletPosition {
