@@ -3,10 +3,12 @@
 //   1. forks Robinhood Chain Testnet locally with Anvil and deploys a fresh copy of the VATE test fixture,
 //   2. builds and serves the app pointed at that fork (separate build dir: .next-e2e),
 //   3. injects an EIP-6963 test wallet backed by an Anvil dev account,
-//   4. walks through connect, faucet, deposit, rejection, portfolio, the share card (its options,
-//      the saved image, the copy, the post on X), a position this browser has no record of, partial
-//      withdraw, MAX, the no-adapter liquidity cap, wrong network, the phone layout,
-//      reload/reconnect, disconnect and the link to X,
+//   4. walks through connect, faucet, rejection, deposit (started with a double click), portfolio,
+//      the share card (its options, the saved image, the copy, the post on X), a position this
+//      browser has no record of, partial withdraw, MAX, a MAX sent straight after a partial
+//      withdrawal (five rounds, each estimated before the vault accrues interest and mined after),
+//      the no-adapter liquidity cap, wrong network, the phone layout, reload/reconnect, disconnect
+//      and the link to X,
 //   5. checks the landing page's music (starts with the first interaction; the sound button
 //      switches it off and on and is remembered) and its pointer lens.
 // Requires Foundry (anvil) and Playwright's Chromium (pnpm exec playwright install chromium).   pnpm test:e2e
@@ -16,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { concatHex, createPublicClient, createTestClient, createWalletClient, defineChain, http } from 'viem';
+import { concatHex, createPublicClient, createTestClient, createWalletClient, defineChain, encodeFunctionData, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,7 +75,7 @@ const check = (name, ok, detail = '') => {
 
 /** Injected into the page: a minimal EIP-1193 wallet announced through EIP-6963. */
 const walletScript = ({ rpc, account }) => {
-  const state = { chainId: '0xb626', rejectNext: false, listeners: {} };
+  const state = { chainId: '0xb626', rejectNext: false, blockTime: null, sent: 0, listeners: {} };
   const isConnected = () => localStorage.getItem('__e2e_connected') === '1';
   const emit = (ev, arg) => (state.listeners[ev] || []).forEach((fn) => fn(arg));
   let id = 0;
@@ -108,6 +110,13 @@ const walletScript = ({ rpc, account }) => {
         case 'wallet_revokePermissions': localStorage.removeItem('__e2e_connected'); return null;
         case 'eth_sendTransaction':
           if (state.rejectNext) reject();
+          state.sent += 1;
+          if (state.blockTime) {
+            // The test chose the timestamp of the block that will carry this transaction.
+            const time = state.blockTime;
+            state.blockTime = null;
+            await call('evm_setNextBlockTimestamp', [time]);
+          }
           return call(method, params);
         default: return call(method, params);
       }
@@ -216,10 +225,14 @@ async function main() {
   await closeModal();
   check('the form is still filled after a rejection', (await amount.inputValue()) === '1000' && !(await cta.isDisabled()));
 
-  // deposit: approve exactly + deposit
-  await cta.click();
+  // deposit: approve exactly + deposit. The button is clicked twice in the same instant, before
+  // the page can do anything about the first click: the hardest form of a double click.
+  const sentBefore = await page.evaluate(() => window.__wallet.state.sent);
+  await cta.evaluate((button) => { button.click(); button.click(); });
   await waitTitle(/Deposit confirmed/);
   const steps = await page.locator('.va-modal .steps li').allTextContents();
+  const sentByDeposit = (await page.evaluate(() => window.__wallet.state.sent)) - sentBefore;
+  check('a double click on the button starts the deposit once: the wallet is asked for one approval and one deposit', sentByDeposit === 2, `${sentByDeposit} transactions requested`);
   check('deposit runs approve + deposit and is confirmed from the receipt', steps.length === 2 && steps.every((s) => /confirmed/.test(s)) && /Deposited 1,000\.00 tUSDG/.test(await text('.va-modal .tx-ok')), steps.join(' | ').replace(/\s+/g, ' '));
   await shot('04-deposit-confirmed');
   await closeModal();
@@ -309,49 +322,84 @@ async function main() {
     download.suggestedFilename() === 'vate-test-vault-i-card.png' && size === '2400×1260' && savedSaid === 'Download started: vate-test-vault-i-card.png' && (await text('.va-modal .sc-note')).startsWith('PNG · 2400 × 1260'),
     `${download.suggestedFilename()} ${size}, ${Math.round(saved.length / 1024)} kB | ${savedSaid}`);
   writeFileSync(join(out, '05d-share-card-saved.png'), saved);
+  writeFileSync(join(out, '05e-share-card-on-screen.png'), onScreen); // the picture the saved one is compared with below
   // The image is painted by its own code (src/lib/card-image.ts), not copied from the screen. To
-  // see that both show the same card, each is cut into squares of 30 design pixels and the mean
-  // colour of every square is compared. How a letter's edge is smoothed does not move a mean; a
-  // label that is missing, a figure that sits elsewhere or a line in another colour does.
+  // see that both show the same card, both are brought to 1200 × 630 and compared pixel by pixel.
+  // The screen snaps letters to whole pixels and the image is painted at twice the size, so a
+  // letter may sit a pixel aside with nothing wrong. A pixel therefore differs only by as much as
+  // its value lies outside the range of the other picture's values within two pixels of it: a
+  // letter that moved a little finds its match there, while a label that is missing, a figure that
+  // reads otherwise or a line in another colour does not. The differences are averaged over
+  // squares of 30 pixels; the worst square is the measure.
   const likeness = (image, screen) => page.evaluate(async ([image, screen]) => {
-    const CELL = 30, COLS = 1200 / CELL, ROWS = 630 / CELL;
-    const means = async (base64, border) => {
+    const W = 1200, H = 630, CELL = 30, REACH = 2, FRAME = 3;
+    /** The picture without its border as three planes of W × H values (2 × 2 pixels averaged when it is twice the size). */
+    const planes = async (base64, border) => {
       const picture = new Image();
       picture.src = `data:image/png;base64,${base64}`;
       await picture.decode();
       const w = picture.naturalWidth - 2 * border, h = picture.naturalHeight - 2 * border;
+      const scale = w / W;
+      if ((scale !== 1 && scale !== 2) || h !== H * scale) return { size: `${w}×${h}`, rgb: null };
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(picture, -border, -border);
       const { data } = ctx.getImageData(0, 0, w, h);
-      const per = (w / 1200) * CELL; // pixels of this picture per square
-      const sums = new Float64Array(COLS * ROWS * 3);
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        const c = (Math.floor(y / per) * COLS + Math.floor(x / per)) * 3, i = (y * w + x) * 4;
-        sums[c] += data[i];
-        sums[c + 1] += data[i + 1];
-        sums[c + 2] += data[i + 2];
+      const rgb = [new Float32Array(W * H), new Float32Array(W * H), new Float32Array(W * H)];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) for (let c = 0; c < 3; c++) {
+        let sum = 0;
+        for (let v = 0; v < scale; v++) for (let u = 0; u < scale; u++) sum += data[((y * scale + v) * w + x * scale + u) * 4 + c];
+        rgb[c][y * W + x] = sum / (scale * scale);
       }
-      return { w, h, means: sums.map((v) => v / (per * per)) };
+      return { size: `${w}×${h}`, rgb };
     };
-    const [p, q] = [await means(image, 0), await means(screen, 1)];
-    let worst = 0, off = 0;
-    for (let c = 0; c < p.means.length; c += 3) {
-      const d = Math.max(Math.abs(p.means[c] - q.means[c]), Math.abs(p.means[c + 1] - q.means[c + 1]), Math.abs(p.means[c + 2] - q.means[c + 2]));
-      worst = Math.max(worst, d);
-      if (d > 6) off += 1;
+    /** Per pixel, the lowest and the highest value within REACH pixels of it. */
+    const range = (plane) => {
+      const rowLow = new Float32Array(W * H), rowHigh = new Float32Array(W * H), low = new Float32Array(W * H), high = new Float32Array(W * H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        let a = 255, b = 0;
+        for (let k = Math.max(0, x - REACH); k <= Math.min(W - 1, x + REACH); k++) { const v = plane[y * W + k]; if (v < a) a = v; if (v > b) b = v; }
+        rowLow[y * W + x] = a;
+        rowHigh[y * W + x] = b;
+      }
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        let a = 255, b = 0;
+        for (let k = Math.max(0, y - REACH); k <= Math.min(H - 1, y + REACH); k++) { if (rowLow[k * W + x] < a) a = rowLow[k * W + x]; if (rowHigh[k * W + x] > b) b = rowHigh[k * W + x]; }
+        low[y * W + x] = a;
+        high[y * W + x] = b;
+      }
+      return { low, high };
+    };
+    const [p, q] = [await planes(image, 0), await planes(screen, 1)];
+    const sizes = `${p.size} and ${q.size}`;
+    if (!p.rgb || !q.rgb) return { worst: Infinity, squares: 0, sizes };
+    const diff = new Float32Array(W * H); // per pixel, the worst of the three colour channels
+    for (let c = 0; c < 3; c++) {
+      const a = p.rgb[c], b = q.rgb[c], nearA = range(a), nearB = range(b);
+      for (let i = 0; i < W * H; i++) {
+        const d = Math.max(nearB.low[i] - a[i], a[i] - nearB.high[i], nearA.low[i] - b[i], b[i] - nearA.high[i]);
+        if (d > diff[i]) diff[i] = d;
+      }
     }
-    return { worst, off, squares: COLS * ROWS, sizes: `${p.w}×${p.h} and ${q.w}×${q.h}` };
+    const COLS = W / CELL, ROWS = H / CELL;
+    const sums = new Float64Array(COLS * ROWS);
+    // The outermost pixels are left out: the image ends in its border line there, the screenshot was cut inside it.
+    for (let y = FRAME; y < H - FRAME; y++) for (let x = FRAME; x < W - FRAME; x++) sums[Math.floor(y / CELL) * COLS + Math.floor(x / CELL)] += diff[y * W + x];
+    let worst = 0;
+    for (const sum of sums) worst = Math.max(worst, sum / (CELL * CELL));
+    return { worst, squares: COLS * ROWS, sizes };
   }, [image.toString('base64'), screen.toString('base64')]);
   const same = await likeness(saved, onScreen);
   const other = await likeness(saved, otherCard);
-  // Measured while writing this check: the same card gives a worst square of 7 to 10, with at most
-  // 4 squares over 6. The smallest faults tried: one small label missing gives a worst square of
-  // 17; the chart line in another colour puts 38 squares over 6. The limits sit halfway.
-  check('share card: the saved image shows the same card as the dialog', same.sizes === '2400×1260 and 1200×630' && same.worst < 13 && same.off <= 20 && other.worst > 60,
-    `worst of ${same.squares} squares differs by ${same.worst.toFixed(1)} of 255, ${same.off} differ by more than 6 | against a different card: ${other.worst.toFixed(0)}, ${other.off} squares`);
+  // Measured while writing this check, over eleven looks of the card (three headlines, both styles,
+  // every drawing, with and without amounts, chart and wallet): the same card gives a worst square
+  // of 0.6 every time. Faults tried: a small dot of the drawing missing gives 6.0, a small label
+  // missing 8.1, the chart line in another colour 10.5, another figure 36; a different card 147 or
+  // more. A label four pixels aside gives 2.6, which the limit of 3 lets pass.
+  check('share card: the saved image shows the same card as the dialog', same.sizes === '2400×1260 and 1200×630' && same.worst < 3 && other.worst > 60,
+    `worst of ${same.squares} squares differs by ${same.worst.toFixed(2)} of 255 | against a different card: ${other.worst.toFixed(0)}`);
 
   // share card: copied, and taken to X
   const clipboard = () => page.evaluate(async () => {
@@ -449,6 +497,58 @@ async function main() {
   await page.locator('.empty', { hasText: 'No vault shares found' }).waitFor({ timeout: 15_000 });
   check('portfolio shows the connected-without-position state', true);
   await page.locator('.tabs button', { hasText: 'Vaults' }).click();
+
+  // Withdraw 25%, then MAX straight away, five rounds. A vault accrues interest inside the
+  // transaction, once per second. The fork's clock is held at the second of the withdrawal while
+  // the app estimates the redeem and moved on three seconds for the block that carries it, so the
+  // estimate leaves the accrual out and the block has to do it. With only a percentage on top of
+  // the estimate, this redeem ran out of gas.
+  const vaultI = fixture.vaults[0].address;
+  const vaultAbi = [
+    { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
+    { type: 'function', name: 'redeem', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }, { type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  ];
+  const sharesHeld = () => pub.readContract({ address: vaultI, abi: vaultAbi, functionName: 'balanceOf', args: [ACCOUNT] });
+  const rounds = [];
+  for (let round = 1; round <= 5; round += 1) {
+    await page.locator('.seg button', { hasText: 'Deposit' }).click();
+    await amount.fill('400');
+    await cta.click();
+    await waitTitle(/Deposit confirmed/);
+    await closeModal();
+    await page.locator('.seg button', { hasText: 'Withdraw' }).click();
+    await page.waitForFunction(() => /In vault (399\.99|400\.0)/.test(document.querySelector('.field > .label span:last-child')?.textContent ?? ''), null, { timeout: 15_000 });
+    await page.locator('.pcts button', { hasText: '25%' }).click();
+    await cta.click();
+    await waitTitle(/Withdrawal confirmed/);
+    await closeModal();
+
+    const withdrawal = await pub.getBlock();
+    const later = withdrawal.timestamp + 3n;
+    const redeem = { account: ACCOUNT, to: vaultI, data: encodeFunctionData({ abi: vaultAbi, functionName: 'redeem', args: [await sharesHeld(), ACCOUNT, ACCOUNT] }) };
+    await node.setNextBlockTimestamp({ timestamp: later });
+    const needed = await pub.estimateGas(redeem); // what the block three seconds on will ask for
+    let clockHeld = true;
+    try { await node.setNextBlockTimestamp({ timestamp: withdrawal.timestamp }); } catch { clockHeld = false; } // a node that refuses two blocks in one second
+    const estimated = await pub.estimateGas(redeem); // what the app is about to be told
+    await page.evaluate((time) => { window.__wallet.state.blockTime = time; }, `0x${later.toString(16)}`);
+    await page.locator('.amount .max').click();
+    await cta.click();
+    await modalTitle.filter({ hasText: /Withdrawal confirmed|Transaction not completed/ }).waitFor({ timeout: 30_000 });
+    const confirmed = /Withdrawal confirmed/.test((await modalTitle.textContent()) ?? '');
+    await closeModal();
+    await page.evaluate(() => { window.__wallet.state.blockTime = null; });
+    const block = await pub.getBlock({ includeTransactions: true });
+    const tx = block.transactions.find((t) => t.to?.toLowerCase() === vaultI.toLowerCase());
+    const used = tx ? (await pub.getTransactionReceipt({ hash: tx.hash })).gasUsed : null;
+    rounds.push({
+      ok: confirmed && (await sharesHeld()) === 0n && block.timestamp === later,
+      text: `estimated ${estimated}, block needed ${needed}, sent ${tx?.gas ?? '—'}, used ${used ?? '—'}${clockHeld ? '' : ' (clock not held)'}${confirmed ? '' : ' FAILED'}`,
+    });
+    if (!confirmed) break;
+  }
+  check('withdraw 25% then MAX straight away is confirmed five times in a row, each estimated before the interest accrual and mined after it',
+    rounds.length === 5 && rounds.every((r) => r.ok), rounds.map((r, i) => `${i + 1}: ${r.text}`).join(' | '));
 
   // vault II: no liquidity adapter -> capped at idle before signing
   await page.locator('.vlist .vault').filter({ has: page.locator('.n', { hasText: /^VATE Test Vault II$/ }) }).click();

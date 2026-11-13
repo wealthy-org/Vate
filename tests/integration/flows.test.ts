@@ -1,19 +1,19 @@
 // End-to-end transaction flows against the VATE testnet fixture on a local fork of
 // Robinhood Chain Testnet. The same executor code runs in the browser; only the wallet differs.
-import { encodeFunctionData, UserRejectedRequestError, type Address, type Hex } from 'viem';
+import { encodeFunctionData, UserRejectedRequestError, type Address, type Hex, type PublicClient } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TEST_USDG_ABI, TEST_VAULT_ABI } from '@/abi/testnet.generated';
 import { ERC20_ABI, VAULT_V2_ABI } from '@/abi/vaultV2';
 import { NETWORKS, type VaultConfig } from '@/config/networks';
-import { readPositionHistory } from '@/lib/chain/history';
+import { DEPOSIT_EVENT, readPositionHistory, WITHDRAW_EVENT } from '@/lib/chain/history';
 import { readVaultChecks, readWallet } from '@/lib/chain/reads';
 import { loadFixtureSnapshot } from '@/lib/data/fixture';
 import { fixtureStatus } from '@/lib/fixture-deploy';
 import { fixtureRateAt } from '@/lib/fixture-rate';
 import { rankVaults } from '@/lib/ranking';
 import { kv, storageKeys, trackedProfit, TxStore } from '@/lib/storage';
-import { executeDeposit, executePlainCall, executeWithdraw, type ExecContext, type WalletPort } from '@/lib/tx/execute';
+import { executeDeposit, executePlainCall, executeWithdraw, gasLimitFor, type ExecContext, type WalletPort } from '@/lib/tx/execute';
 import { flowReducer, INITIAL_FLOW, type FlowEvent, type FlowState } from '@/lib/tx/machine';
 import { reconcilePending } from '@/lib/tx/reconcile';
 import { deployFixture, devWallet, DEV_KEYS, startAnvil, type Anvil, type TestWallet } from '../helpers/anvil';
@@ -29,10 +29,7 @@ let token: Address;
 async function freshWallet(claim = true): Promise<TestWallet> {
   const wallet = devWallet(anvil, generatePrivateKey());
   await anvil.test.setBalance({ address: wallet.address, value: 10n ** 19n });
-  if (claim) {
-    const hash = await wallet.client.writeContract({ account: wallet.client.account!, chain: anvil.chain, address: token, abi: TEST_USDG_ABI, functionName: 'faucet' });
-    await anvil.publicClient.waitForTransactionReceipt({ hash });
-  }
+  if (claim) await send(wallet, token, encodeFunctionData({ abi: TEST_USDG_ABI, functionName: 'faucet' }));
   wallet.sent = 0;
   return wallet;
 }
@@ -65,9 +62,17 @@ const read = {
   assetsOf: (vault: Address, shares: bigint) => anvil.publicClient.readContract({ address: vault, abi: VAULT_V2_ABI, functionName: 'convertToAssets', args: [shares] }),
 };
 
+/**
+ * A setup transaction sent straight from the test, the way a script would. It gets the app's gas
+ * limit and must succeed: one that reverts fails the test here, not at a later assertion.
+ */
 async function send(wallet: TestWallet, to: Address, data: Hex) {
-  const hash = await wallet.client.sendTransaction({ account: wallet.client.account!, chain: anvil.chain, to, data });
-  return anvil.publicClient.waitForTransactionReceipt({ hash });
+  const account = wallet.client.account!;
+  const gas = await anvil.publicClient.estimateGas({ account, to, data });
+  const hash = await wallet.client.sendTransaction({ account, chain: anvil.chain, to, data, gas: gasLimitFor(gas) });
+  const receipt = await anvil.publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== 'success') throw new Error(`setup tx reverted: ${hash}`);
+  return receipt;
 }
 const approveData = (spender: Address, amount: bigint) => encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [spender, amount] });
 
@@ -425,6 +430,85 @@ describe('withdraw', () => {
   });
 });
 
+describe('interest accrued between the estimate and the block', () => {
+  // A vault does its interest accrual once per second. A transaction estimated in the second of
+  // the previous transaction on that vault is estimated without that work and, mined a moment
+  // later, has to do it. The chain estimates against its latest block, so the estimates here do too.
+  type EstimateArgs = Parameters<PublicClient['estimateGas']>[0];
+  const estimatingOnLastBlock = (estimates: bigint[]): PublicClient =>
+    ({
+      ...anvil.publicClient,
+      estimateGas: async (args: EstimateArgs) => {
+        const gas = await anvil.publicClient.estimateGas({ ...args, blockTag: 'latest' } as EstimateArgs);
+        estimates.push(gas);
+        return gas;
+      },
+    }) as PublicClient;
+  /** Mines what the wallet sends in a block stamped `seconds` after the one it was estimated on. */
+  const minedLater = (wallet: TestWallet, seconds: bigint, sent: bigint[]): WalletPort => ({
+    ...wallet,
+    sendTransaction: async (tx) => {
+      sent.push(tx.gas);
+      const last = await anvil.publicClient.getBlock();
+      await anvil.test.setNextBlockTimestamp({ timestamp: last.timestamp + seconds });
+      return wallet.sendTransaction(tx);
+    },
+  });
+  const blockOf = async (hash: Hex) => anvil.publicClient.getBlock({ blockNumber: (await anvil.publicClient.getTransactionReceipt({ hash })).blockNumber });
+
+  it('MAX straight after a partial withdrawal confirms although the block needs more gas than was estimated', async () => {
+    const wallet = await freshWallet();
+    const before = harness(wallet, wallet.address);
+    expect((await executeDeposit(before.ctx, { vault: vaultI, vaultName: 'Vault I', amount: 1_000n * U })).status).toBe('success');
+    expect((await executeWithdraw(before.ctx, { vault: vaultI, vaultName: 'Vault I', amount: 250n * U, redeemAll: false })).status).toBe('success');
+
+    // The same redeem, priced on the block of that withdrawal and on a block three seconds later.
+    const withdrawal = await anvil.publicClient.getBlock();
+    const shares = await read.shares(vaultI.address, wallet.address);
+    const redeem = { account: wallet.address, to: vaultI.address, data: encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'redeem', args: [shares, wallet.address, wallet.address] }) };
+    const sameSecond = await anvil.publicClient.estimateGas({ ...redeem, blockTag: 'latest' });
+    await anvil.test.setNextBlockTimestamp({ timestamp: withdrawal.timestamp + 3n });
+    const threeSecondsLater = await anvil.publicClient.estimateGas(redeem);
+    expect(threeSecondsLater > sameSecond).toBe(true);
+
+    const estimates: bigint[] = [];
+    const sent: bigint[] = [];
+    const h = harness(minedLater(wallet, 3n, sent), wallet.address, { publicClient: estimatingOnLastBlock(estimates) });
+    const out = await executeWithdraw(h.ctx, { vault: vaultI, vaultName: 'Vault I', amount: 0n, redeemAll: true });
+
+    expect(out.status).toBe('success');
+    expect(h.state().steps.map((x) => [x.kind, x.status])).toEqual([['redeem', 'confirmed']]);
+    expect(await read.shares(vaultI.address, wallet.address)).toBe(0n);
+    expect(estimates).toEqual([sameSecond]); // priced without the accrual...
+    expect(sent).toEqual([gasLimitFor(sameSecond)]);
+    expect(sent[0]! >= threeSecondsLater).toBe(true); // ...and sent with room for it
+    if (out.status === 'success') expect((await blockOf(out.record.hash)).timestamp).toBe(withdrawal.timestamp + 3n);
+    // The fee shown while the wallet is open is the expected one (estimate x price), not the limit.
+    const shown = h.events.find((e) => e.type === 'STEP_WALLET');
+    expect(shown?.type === 'STEP_WALLET' && shown.feeWei !== null && shown.feeWei > 0n && shown.feeWei % sameSecond).toBe(0n);
+  });
+
+  it('a second deposit and a partial withdrawal priced on the previous block confirm too, a second or an hour later', async () => {
+    const wallet = await freshWallet();
+    await send(wallet, token, approveData(vaultI.address, 900n * U)); // no approval step in between: every flow below follows a vault transaction
+    const plain = harness(wallet, wallet.address);
+    expect((await executeDeposit(plain.ctx, { vault: vaultI, vaultName: 'Vault I', amount: 300n * U })).status).toBe('success');
+
+    const estimates: bigint[] = [];
+    const sent: bigint[] = [];
+    const run = (seconds: bigint) => harness(minedLater(wallet, seconds, sent), wallet.address, { publicClient: estimatingOnLastBlock(estimates) }).ctx;
+    expect((await executeDeposit(run(1n), { vault: vaultI, vaultName: 'Vault I', amount: 300n * U })).status).toBe('success');
+    expect((await executeWithdraw(run(3_600n), { vault: vaultI, vaultName: 'Vault I', amount: 100n * U, redeemAll: false })).status).toBe('success');
+    expect((await executeDeposit(run(3_600n), { vault: vaultI, vaultName: 'Vault I', amount: 300n * U })).status).toBe('success');
+    expect((await executeWithdraw(run(1n), { vault: vaultI, vaultName: 'Vault I', amount: 100n * U, redeemAll: false })).status).toBe('success');
+
+    expect(sent).toHaveLength(4);
+    expect(sent).toEqual(estimates.map(gasLimitFor));
+    expect(await read.allowance(wallet.address, vaultI.address)).toBe(0n);
+    expect(await read.balance(wallet.address)).toBe(10_000n * U - 900n * U + 200n * U);
+  });
+});
+
 describe('portfolio reads and tracking', () => {
   it('reads several positions as convertToAssets(balanceOf) and flags outside activity', async () => {
     const wallet = await freshWallet();
@@ -467,6 +551,22 @@ describe('position history read back from the chain', () => {
   const near = { span: 5_000n, maxWindows: 2 } as const;
   const depositData = (amount: bigint, onBehalf: Address) => encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'deposit', args: [amount, onBehalf] });
   const blockTime = async (blockNumber: bigint) => Number((await anvil.publicClient.getBlock({ blockNumber })).timestamp) * 1000;
+  /** The history of a position that must have one. A null fails with what the chain holds: the share balance and every event. */
+  async function historyOf(vault: Address, account: Address, shares: bigint) {
+    const ledger = await readPositionHistory(anvil.publicClient, { vault, account, shares, ...near });
+    if (ledger !== null) return ledger;
+    const latest = await anvil.publicClient.getBlockNumber();
+    const range = { address: vault, fromBlock: latest - near.span, toBlock: latest } as const;
+    const [held, deposits, withdrawals] = await Promise.all([
+      read.shares(vault, account),
+      anvil.publicClient.getLogs({ ...range, event: DEPOSIT_EVENT, args: { onBehalf: account } }),
+      anvil.publicClient.getLogs({ ...range, event: WITHDRAW_EVENT, args: { onBehalf: account } }),
+    ]);
+    const events = [...deposits.map((l) => ({ ...l, kind: 'deposit' })), ...withdrawals.map((l) => ({ ...l, kind: 'withdraw' }))]
+      .sort((a, b) => Number(a.blockNumber - b.blockNumber) || a.logIndex - b.logIndex)
+      .map((l) => `block ${l.blockNumber} ${l.kind} assets ${l.args.assets} shares ${l.args.shares}`);
+    throw new Error(`readPositionHistory returned null for ${account}. Shares asked about ${shares}, held now ${held} (block ${latest}). Events: ${events.join('; ') || 'none'}`);
+  }
 
   it('rebuilds the ledger of a position this browser never saw: opened from a script, grown, partly withdrawn', async () => {
     const wallet = await freshWallet();
@@ -479,7 +579,7 @@ describe('position history read back from the chain', () => {
     const state = (await readWallet(anvil.publicClient, anvil.network, wallet.address)).vaults[vaultI.address.toLowerCase()]!;
     expect(trackedProfit(store.ledger(vaultI.address), state.shares, state.assets)).toEqual({ status: 'not-tracked' });
 
-    const ledger = await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: wallet.address, shares: state.shares, ...near });
+    const ledger = await historyOf(vaultI.address, wallet.address, state.shares);
     expect(ledger).toEqual({
       deposited: (3_000n * U).toString(),
       withdrawn: (500n * U).toString(),
@@ -489,7 +589,7 @@ describe('position history read back from the chain', () => {
       openedAt: await blockTime(first.blockNumber),
       updatedAt: await blockTime(last.blockNumber),
     });
-    store.adoptLedger(vaultI.address, ledger!);
+    store.adoptLedger(vaultI.address, ledger);
     const profit = trackedProfit(store.ledger(vaultI.address), state.shares, state.assets);
     expect(profit.status).toBe('tracked');
     // 2,500 left in a vault paying a few percent a year, seconds after the deposits: within a cent of zero.
@@ -500,10 +600,10 @@ describe('position history read back from the chain', () => {
     const out = await executeWithdraw(h.ctx, { vault: vaultI, vaultName: 'Vault I', amount: 100n * U, redeemAll: false });
     expect(out.status).toBe('success');
     const after = (await readWallet(anvil.publicClient, anvil.network, wallet.address)).vaults[vaultI.address.toLowerCase()]!;
-    expect(h.store.ledger(vaultI.address)).toMatchObject({ withdrawn: (600n * U).toString(), shares: after.shares.toString(), incomplete: false, txCount: 4, openedAt: ledger!.openedAt });
+    expect(h.store.ledger(vaultI.address)).toMatchObject({ withdrawn: (600n * U).toString(), shares: after.shares.toString(), incomplete: false, txCount: 4, openedAt: ledger.openedAt });
     expect(trackedProfit(h.store.ledger(vaultI.address), after.shares, after.assets).status).toBe('tracked');
     // ...and the chain agrees with what this browser now has.
-    expect(await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: wallet.address, shares: after.shares, ...near })).toMatchObject({ deposited: (3_000n * U).toString(), withdrawn: (600n * U).toString(), txCount: 4, openedAt: ledger!.openedAt });
+    expect(await historyOf(vaultI.address, wallet.address, after.shares)).toMatchObject({ deposited: (3_000n * U).toString(), withdrawn: (600n * U).toString(), txCount: 4, openedAt: ledger.openedAt });
   });
 
   it('starts again at the deposit that reopened a closed position', async () => {
@@ -514,7 +614,7 @@ describe('position history read back from the chain', () => {
     await send(wallet, vaultIII.address, encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'redeem', args: [all, wallet.address, wallet.address] }));
     const reopened = await send(wallet, vaultIII.address, depositData(250n * U, wallet.address));
     const shares = await read.shares(vaultIII.address, wallet.address);
-    expect(await readPositionHistory(anvil.publicClient, { vault: vaultIII.address, account: wallet.address, shares, ...near })).toMatchObject({
+    expect(await historyOf(vaultIII.address, wallet.address, shares)).toMatchObject({
       deposited: (250n * U).toString(),
       withdrawn: '0',
       txCount: 1,
@@ -541,7 +641,7 @@ describe('position history read back from the chain', () => {
     await send(payer, vaultI.address, depositData(400n * U, owner.address));
     const shares = await read.shares(vaultI.address, owner.address);
     expect(shares > 0n).toBe(true);
-    expect(await readPositionHistory(anvil.publicClient, { vault: vaultI.address, account: owner.address, shares, ...near })).toMatchObject({ deposited: (400n * U).toString(), txCount: 1 });
+    expect(await historyOf(vaultI.address, owner.address, shares)).toMatchObject({ deposited: (400n * U).toString(), txCount: 1 });
     expect(await read.shares(vaultI.address, payer.address)).toBe(0n);
   });
 });
