@@ -56,6 +56,18 @@ export function formatAmount(value: bigint, decimals: number, maxFraction = 2, m
   return `${neg ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
 }
 
+const GWEI = 10n ** 9n;
+
+/**
+ * A network fee or a gas balance in ETH. A transaction on Robinhood Chain costs around a millionth
+ * of an ETH, which six decimals would print as 0.000001 or 0.000000, so this keeps nine (one gwei).
+ * `roundUp` is for an amount that is required: it is never shown as less than it is.
+ */
+export function formatGasEth(wei: bigint, roundUp = false): string {
+  const shown = roundUp ? ((wei + GWEI - 1n) / GWEI) * GWEI : wei;
+  return formatAmount(shown, 18, 9, 6);
+}
+
 /** Lossy conversion for analytics and estimates only. */
 export function toNumber(value: bigint, decimals: number): number {
   const base = 10n ** BigInt(decimals);

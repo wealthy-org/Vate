@@ -18,7 +18,7 @@ import type { NetworkConfig, VaultConfig } from '@/config/networks';
 import { readVaultChecks, readWallet } from '../chain/reads';
 import type { TxStore } from '../storage';
 import type { ActivityRecord, PendingRecord, TxKind } from '../types';
-import { formatAmount } from '../units';
+import { formatAmount, formatGasEth } from '../units';
 import { classifyError, fail, FlowError, TOKEN_CALL_ABI, VAULT_CALL_ABI, type ErrorContext, type TxError } from './errors';
 import type { FlowEvent } from './machine';
 
@@ -59,6 +59,20 @@ export type FlowOutcome =
   | { status: 'unknown'; hash: Hex };
 
 export const GAS_BUFFER_PERCENT = 30n;
+/** Interest accrual inside the vault can add a fixed chunk of work between estimate and inclusion. */
+export const GAS_BUFFER_FIXED = 40_000n;
+
+/**
+ * The gas limit to send for a transaction the node estimated at `estimate`.
+ *
+ * A vault accrues interest inside the transaction, once per second. An estimate made in the same
+ * second as the previous transaction on that vault skips that work; the transaction then lands a
+ * second later and has to do it. On a cheap call that is more than a percentage covers (a redeem
+ * on the test vaults goes from 62,868 to 83,924 gas), hence the fixed part. Unused gas is not charged.
+ */
+export function gasLimitFor(estimate: bigint): bigint {
+  return (estimate * (100n + GAS_BUFFER_PERCENT)) / 100n + GAS_BUFFER_FIXED;
+}
 
 export function errorContext(network: NetworkConfig): ErrorContext {
   return { assetSymbol: network.asset.symbol, assetDecimals: network.asset.decimals, networkLabel: network.label };
@@ -112,19 +126,22 @@ async function sendAndWait(step: PlannedStep, o: SendOptions): Promise<StepResul
     o.publicClient.getGasPrice(),
     o.publicClient.getBalance({ address: o.account }),
   ]);
-  const feeWei = gas * gasPrice;
-  if (eth < feeWei) {
+  const gasLimit = gasLimitFor(gas);
+  // A node only accepts a transaction whose whole gas limit the balance can pay for, so the
+  // balance is checked against the limit. The fee shown to the user stays the expected one.
+  const maxFeeWei = gasLimit * gasPrice;
+  if (eth < maxFeeWei) {
     throw fail(
       'insufficient-gas',
-      `This step needs about ${formatAmount(feeWei, 18, 6)} ETH for gas, but the wallet holds ${formatAmount(eth, 18, 6)} ETH on ${o.network.label}.`,
+      `This step needs up to ${formatGasEth(maxFeeWei, true)} ETH for gas, but the wallet holds ${formatGasEth(eth)} ETH on ${o.network.label}.`,
     );
   }
-  o.onWallet?.(feeWei);
+  o.onWallet?.(gas * gasPrice);
   const hash = await o.wallet.sendTransaction({
     account: o.account,
     to: step.to,
     data: step.data,
-    gas: (gas * (100n + GAS_BUFFER_PERCENT)) / 100n,
+    gas: gasLimit,
   });
 
   // From here on a transaction exists. Errors must never be reported as "nothing was sent".

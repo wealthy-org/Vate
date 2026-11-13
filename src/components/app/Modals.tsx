@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { explorerTx, NETWORK } from '@/config/networks';
 import type { WalletOption } from '@/hooks/useWallet';
 import { flowTitle, isBusy, stepStatusLabel, type FlowState, type FlowStep } from '@/lib/tx/machine';
-import { formatAmount } from '@/lib/units';
+import { formatAmount, formatGasEth } from '@/lib/units';
 import { Modal } from './ui';
 
 export function WalletModal({
@@ -98,7 +98,7 @@ export function TxModal({ open, flow, onClose }: { open: boolean; flow: FlowStat
             <span className="t">{s.label}</span>
             <small>
               {stepStatusLabel(s)}
-              {s.status === 'wallet' && s.feeWei != null ? <><br />est. fee {formatAmount(s.feeWei, 18, 6)} ETH</> : null}
+              {s.status === 'wallet' && s.feeWei != null ? <><br />est. fee {formatGasEth(s.feeWei)} ETH</> : null}
               {s.hash ? <> · <a href={explorerTx(NETWORK, s.hash)} target="_blank" rel="noopener noreferrer">{s.status === 'confirmed' ? 'tx ↗' : 'view ↗'}</a></> : null}
             </small>
           </li>

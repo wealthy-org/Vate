@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fmtAge, fmtCompactUsd, fmtPct, fmtSigned, fmtUsd, shortAddress } from '@/lib/format';
 import { estimateEarnings, summarizePortfolio } from '@/lib/portfolio';
-import { formatAmount, parseAmount, percentOf, sanitizeAmountInput, toDecimalString, toNumber } from '@/lib/units';
+import { formatAmount, formatGasEth, parseAmount, percentOf, sanitizeAmountInput, toDecimalString, toNumber } from '@/lib/units';
 
 describe('parseAmount (strict, integer units)', () => {
   it('parses 6-decimal asset amounts exactly', () => {
@@ -68,6 +68,18 @@ describe('formatting integer units', () => {
     expect(formatAmount(10n ** 18n, 18, 4)).toBe('1.0000');
     expect(formatAmount(-2_500_000n, 6)).toBe('-2.50');
     expect(formatAmount(123n, 0)).toBe('123');
+  });
+
+  it('shows a network fee of a millionth of an ETH as a figure, not as zero', () => {
+    expect(formatGasEth(84_000n * 10_000_000n)).toBe('0.00000084'); // 84,000 gas at 0.01 gwei: six decimals print 0.000000
+    expect(formatGasEth(58_000n * 20_000_000n)).toBe('0.00000116'); // an approval at 0.02 gwei: six decimals print 0.000001
+    expect(formatGasEth(10n ** 18n)).toBe('1.000000');
+    expect(formatGasEth(0n)).toBe('0.000000');
+    // A balance is cut, an amount that is needed is rounded up, so the two never read the same.
+    expect(formatGasEth(2_912_300_000_000n)).toBe('0.000002912');
+    expect(formatGasEth(2_912_300_000_000n, true)).toBe('0.000002913');
+    expect(formatGasEth(2_912_000_000_000n, true)).toBe('0.000002912');
+    expect(formatGasEth(1n, true)).toBe('0.000000001');
   });
 
   it('percentOf floors and validates', () => {
