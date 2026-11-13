@@ -522,10 +522,76 @@
   .va .va-footer nav { order: 2; }
 }
 
-/* Runtime network selector; never change chain during an active transaction flow. */
-.net-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--line, #ffffff24);border-radius:9px;background:#ffffff05}
-.net-btn{font:inherit;font-size:11px;padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#91979f;cursor:pointer}
-.net-btn.net-active{background:#d4f878;color:#13180c}
-.net-btn:disabled{opacity:.5;cursor:not-allowed}
-.net-btn:focus-visible{outline:2px solid #d4f878;outline-offset:3px}
-@media(max-width:600px){.va-header{flex-wrap:wrap}.hdr-r{flex-wrap:wrap}.net-btn{padding:6px 8px}}
+/* Dark mint network selector. Switching stays locked during a vault transaction. */
+.va .net-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(137, 210, 186, .20);
+  border-radius: 11px;
+  background: #080f0e;
+  box-shadow: inset 0 1px 0 rgba(192, 255, 231, .025);
+}
+.va .net-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #8da69e;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.va .net-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #567b70;
+  transition: background .18s ease, box-shadow .18s ease;
+}
+.va .net-live {
+  padding: 3px 4px;
+  border-radius: 3px;
+  background: rgba(139, 189, 170, .065);
+  color: #8da69e;
+  font-family: var(--f-m), monospace;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+.va .net-btn:hover:not(:disabled) {
+  color: #c4e9dc;
+  background: rgba(139, 220, 188, .045);
+}
+.va .net-btn.net-active {
+  color: #c6f6e5;
+  border-color: rgba(139, 225, 195, .30);
+  background: linear-gradient(115deg, rgba(113, 212, 178, .17), rgba(61, 122, 102, .12));
+  box-shadow: inset 0 0 12px rgba(119, 237, 193, .055), 0 0 9px rgba(104, 225, 182, .08);
+}
+.va .net-active .net-dot {
+  background: #9af4d3;
+  box-shadow: 0 0 5px #9af4d3, 0 0 11px rgba(133, 246, 204, .5);
+}
+.va .net-active .net-live { color: #b6dfcf; }
+.va .net-btn:disabled { opacity: .5; cursor: not-allowed; }
+.va .net-btn:focus-visible { outline: 2px solid #9af4d3; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .va-header { flex-wrap: wrap; }
+  .hdr-r { flex-wrap: wrap; }
+  .va .net-btn { padding: 0 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .va .net-btn, .va .net-dot { transition: none; }
+}

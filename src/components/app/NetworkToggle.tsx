@@ -9,8 +9,10 @@ export function NetworkToggle({ active, onSwitch, disabled = false }: {
     <div className="net-toggle" role="group" aria-label="Network">
       {(['mainnet', 'testnet'] as const).map((key) => (
         <button type="button" key={key} className={`net-btn${active === key ? ' net-active' : ''}`}
-          aria-pressed={active === key} disabled={disabled} onClick={() => { if (active !== key) onSwitch(key); }}>
-          {key === 'mainnet' ? 'Mainnet' : 'Testnet'}
+          aria-label={key === 'mainnet' ? 'Mainnet' : 'Testnet'} aria-pressed={active === key} disabled={disabled} onClick={() => { if (active !== key) onSwitch(key); }}>
+          <span className="net-dot" aria-hidden="true" />
+          <span>{key === 'mainnet' ? 'Mainnet' : 'Testnet'}</span>
+          {key === 'mainnet' ? <span className="net-live">LIVE</span> : null}
         </button>
       ))}
     </div>
