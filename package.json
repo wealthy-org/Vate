@@ -18,6 +18,7 @@
     "contracts:test": "cd contracts && forge test",
     "contracts:export": "node scripts/export-artifacts.mjs",
     "deploy:testnet": "node scripts/deploy-testnet.mjs",
+    "showcase:mainnet": "node scripts/showcase-mainnet.mjs",
     "verify:mappings": "node scripts/verify-mappings.mjs",
     "qa:screens": "node scripts/qa-screens.mjs",
     "test:e2e": "node scripts/e2e.mjs",

@@ -7,3 +7,6 @@ contracts/out/
 contracts/cache/
 .env
 .env.*
+
+# Generated TypeScript modules for the read-only CLI showcase
+.cache/
