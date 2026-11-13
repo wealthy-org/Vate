@@ -6,10 +6,13 @@
 //   pnpm verify:mappings testnet      testnet fixture (chain only)
 //
 // The addresses are parsed from the TypeScript config itself, so this cannot drift from the build.
+// The RPC list is the build's too: NEXT_PUBLIC_RPC_PRIMARY / _FALLBACK_1 / _FALLBACK_2 first, then
+// the public endpoints. Every endpoint is tried with a real contract read; the checks then read
+// through the ones that answered, moving to the next when one fails, as the app does.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPublicClient, getAddress, http, isAddressEqual, keccak256, parseAbi } from 'viem';
+import { createPublicClient, fallback, getAddress, http, isAddressEqual, keccak256, parseAbi } from 'viem';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const target = process.argv[2] === 'testnet' ? 'testnet' : 'mainnet';
@@ -46,22 +49,79 @@ function block(startMarker, endMarker) {
   if (a < 0 || b < 0) throw new Error(`could not find ${startMarker} in networks.ts`);
   return source.slice(a, b);
 }
-const listOf = (name) => Array.from(block(`const ${name} = [`, '] as const')?.matchAll(/'(https:\/\/[^']+)'/g), (m) => m[1]);
 
+/** Same rule as src/config/env.ts: https, or http on this machine. */
+function override(value) {
+  try {
+    const u = new URL(String(value ?? '').trim());
+    const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+    if (u.protocol === 'https:' || (u.protocol === 'http:' && local)) return u.toString().replace(/\/$/, '');
+  } catch {
+    /* not set, or not a URL */
+  }
+  return null;
+}
+const OVERRIDES = [process.env.NEXT_PUBLIC_RPC_PRIMARY, process.env.NEXT_PUBLIC_RPC_FALLBACK_1, process.env.NEXT_PUBLIC_RPC_FALLBACK_2].map(override).filter(Boolean);
+const listOf = (name) => Array.from(new Set([...OVERRIDES, ...Array.from(block(`const ${name} = [`, '] as const')?.matchAll(/'(https:\/\/[^']+)'/g), (m) => m[1])]));
+
+const clip = (text, max = 110) => String(text).replace(/\s+/g, ' ').trim().slice(0, max);
+/** Why a request failed, in a few words: the HTTP status, the node's own message, or the network error underneath. */
+function reason(e) {
+  const find = (name) => (typeof e?.walk === 'function' ? e.walk((x) => x?.name === name) : null);
+  const httpError = find('HttpRequestError');
+  if (httpError?.status) return `HTTP ${httpError.status}${httpError.details ? ` (${clip(httpError.details)})` : ''}`;
+  if (httpError) {
+    const cause = httpError.cause?.cause ?? httpError.cause;
+    return `no connection (${clip(cause?.code ?? cause?.message ?? httpError.details ?? 'request failed')})`;
+  }
+  if (find('TimeoutError')) return 'no answer in time';
+  const rpcError = find('RpcRequestError');
+  if (rpcError) return `the node said "${clip(rpcError.details ?? rpcError.shortMessage)}"`;
+  return clip(e?.shortMessage ?? e?.message ?? e);
+}
+
+/** A read every node of both networks can answer: Multicall3, the contract the app batches its reads through. */
+const PROBE = {
+  address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+  abi: parseAbi(['function getBlockNumber() view returns (uint256)']),
+  functionName: 'getBlockNumber',
+};
+
+/**
+ * Tries every endpoint with `eth_chainId` and with a contract read, since an endpoint can answer
+ * the first and refuse the second. Returns one client over the endpoints that passed, in the
+ * configured order. An endpoint that fails is a warning: the app skips it in the same way.
+ */
 async function rpcClient(urls, chainId) {
-  let client = null;
+  const usable = [];
   for (const url of urls) {
+    const c = createPublicClient({ transport: http(url, { timeout: 15_000, retryCount: 1 }) });
+    let id;
     try {
-      const c = createPublicClient({ transport: http(url, { timeout: 15_000 }) });
-      const id = await c.getChainId();
-      check(id === chainId, `RPC ${url} answers chain ${chainId}`, `got ${id}`);
-      if (id === chainId && !client) client = c;
+      id = await c.getChainId();
     } catch (e) {
-      warn(`RPC ${url} unreachable: ${String(e?.shortMessage ?? e?.message ?? e).slice(0, 100)}`);
+      warn(`RPC ${url} cannot be used from this machine: ${reason(e)}`);
+      continue;
+    }
+    if (id !== chainId) {
+      bad(`RPC ${url} answers chain ${chainId} — got ${id}`);
+      continue;
+    }
+    try {
+      await c.readContract(PROBE);
+      ok(`RPC ${url} answers chain ${chainId} and contract reads`);
+      usable.push(url);
+    } catch (e) {
+      warn(`RPC ${url} answers chain ${chainId} but refuses a contract read: ${reason(e)}`);
     }
   }
-  if (!client) throw new Error('no RPC endpoint reachable');
-  return client;
+  if (usable.length === 0) throw new Error('no RPC endpoint answers contract reads from this machine, so nothing below could be checked');
+  if (usable.length < urls.length) {
+    console.log(`  · reading through ${usable.length} of ${urls.length} endpoints. The app does the same: it moves to the next endpoint when one fails.`);
+  }
+  return createPublicClient({
+    transport: fallback(usable.map((url) => http(url, { timeout: 15_000 })), { retryCount: 2, retryDelay: 400 }),
+  });
 }
 
 async function mainnet() {

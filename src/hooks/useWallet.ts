@@ -137,7 +137,8 @@ export function useChainHistory(account: Address | null, wallet: WalletSnapshot 
       },
       staleTime: Infinity,
       gcTime: 30 * 60_000,
-      retry: 1,
+      // The read retries its own requests and keeps what it has; starting over would ask for all of it again.
+      retry: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     })),

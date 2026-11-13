@@ -548,7 +548,8 @@ describe('portfolio reads and tracking', () => {
 
 describe('position history read back from the chain', () => {
   // The fork has a few minutes of blocks of its own; a short stretch keeps the search local.
-  const near = { span: 5_000n, maxWindows: 2 } as const;
+  // A local node has no request budget to stay inside, so the searches do not wait for a turn.
+  const near = { span: 5_000n, maxWindows: 2, pace: async () => {} } as const;
   const depositData = (amount: bigint, onBehalf: Address) => encodeFunctionData({ abi: VAULT_V2_ABI, functionName: 'deposit', args: [amount, onBehalf] });
   const blockTime = async (blockNumber: bigint) => Number((await anvil.publicClient.getBlock({ blockNumber })).timestamp) * 1000;
   /** The history of a position that must have one. A null fails with what the chain holds: the share balance and every event. */

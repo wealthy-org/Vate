@@ -20,8 +20,37 @@ export const WITHDRAW_EVENT = parseAbiItem(
  * one wallet over up to 10,000,000 blocks (about 12 days on mainnet, 18 on testnet).
  */
 export const HISTORY_SPAN = 9_000_000n;
-/** How far back the search goes before giving up: 30 requests' worth, most of a year. */
+/** How far back the search goes before giving up: 30 stretches, 270 million blocks. */
 export const HISTORY_MAX_WINDOWS = 30;
+
+/**
+ * The chain's own endpoint budgets these searches per visitor. Measured on mainnet on 2026-11-13:
+ * about 25 in a row pass, then 5 a second, and one too many makes it refuse every request from
+ * that address, of any kind, for four to five seconds. So the stretches take turns, for all the
+ * positions being read on the page together: a few at once, then one at a steady pace. A stretch
+ * is two requests, which keeps the search under half of that budget.
+ */
+export const HISTORY_BURST = 4;
+export const HISTORY_PACE_MS = 800;
+/** A request that fails is made once more after this long, which outlasts the endpoint's refusal. */
+export const HISTORY_RETRY_MS = 5_000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Hands out turns: `burst` of them at once, then one every `everyMs`. Idle time saves up at most `burst`. */
+export function createPacer(burst: number, everyMs: number): () => Promise<void> {
+  /** When the next turn is due. A time in the past is a turn already saved up. */
+  let due = 0;
+  return async () => {
+    const now = Date.now();
+    due = Math.max(due, now - (burst - 1) * everyMs);
+    const at = due;
+    due += everyMs;
+    if (at > now) await sleep(at - now);
+  };
+}
+
+const takeTurn = createPacer(HISTORY_BURST, HISTORY_PACE_MS);
 
 export interface HistoryEvent {
   kind: 'deposit' | 'withdraw';
@@ -88,6 +117,10 @@ export interface HistoryRequest {
   /** Blocks per request and number of requests; the defaults suit the public endpoints. */
   span?: bigint;
   maxWindows?: number;
+  /** Waits for a turn before each stretch. Default: the page-wide pace above. */
+  pace?: () => Promise<void>;
+  /** Pause before the second try of a failed request. Default: HISTORY_RETRY_MS. */
+  retryMs?: number;
 }
 
 /**
@@ -95,22 +128,38 @@ export interface HistoryRequest {
  * the wallet last held no shares, and when that was. Null when the events do not explain the
  * share balance (shares moved by a plain transfer) or the position is older than the search goes.
  * Throws when the node cannot be asked, so a caller can tell "unknown" from "try again".
+ *
+ * A request that fails is made once more after a pause, and the search carries on from there:
+ * what was already read is not asked for again.
  */
 export async function readPositionHistory(client: PublicClient, request: HistoryRequest): Promise<VaultLedger | null> {
   const { vault, account, shares } = request;
   if (shares <= 0n) return null;
   const span = request.span ?? HISTORY_SPAN;
   const maxWindows = request.maxWindows ?? HISTORY_MAX_WINDOWS;
+  const pace = request.pace ?? takeTurn;
+  const retryMs = request.retryMs ?? HISTORY_RETRY_MS;
+  const ask = async <T>(read: () => Promise<T>): Promise<T> => {
+    try {
+      return await read();
+    } catch {
+      await sleep(retryMs);
+      return read();
+    }
+  };
   let state = startWalk(shares);
-  let to = await client.getBlockNumber({ cacheTime: 0 });
+  let to = await ask(() => client.getBlockNumber({ cacheTime: 0 }));
 
   for (let window = 0; window < maxWindows && to >= 0n; window += 1) {
     const from = to >= span ? to - span + 1n : 0n;
     const range = { address: vault, fromBlock: from, toBlock: to, strict: true } as const;
-    const [deposits, withdrawals] = await Promise.all([
-      client.getLogs({ ...range, event: DEPOSIT_EVENT, args: { onBehalf: account } }),
-      client.getLogs({ ...range, event: WITHDRAW_EVENT, args: { onBehalf: account } }),
-    ]);
+    await pace();
+    const [deposits, withdrawals] = await ask(() =>
+      Promise.all([
+        client.getLogs({ ...range, event: DEPOSIT_EVENT, args: { onBehalf: account } }),
+        client.getLogs({ ...range, event: WITHDRAW_EVENT, args: { onBehalf: account } }),
+      ]),
+    );
     const events: HistoryEvent[] = [];
     for (const log of deposits) {
       if (log.blockNumber == null || log.logIndex == null) continue; // not mined yet
@@ -123,10 +172,12 @@ export async function readPositionHistory(client: PublicClient, request: History
     const walk = walkBack(state, events);
     if (walk.status === 'mismatch') return null;
     if (walk.status === 'found') {
-      const [opened, newest] = await Promise.all([
-        client.getBlock({ blockNumber: walk.openedBlock }),
-        walk.newestBlock === walk.openedBlock ? null : client.getBlock({ blockNumber: walk.newestBlock }),
-      ]);
+      const [opened, newest] = await ask(() =>
+        Promise.all([
+          client.getBlock({ blockNumber: walk.openedBlock }),
+          walk.newestBlock === walk.openedBlock ? null : client.getBlock({ blockNumber: walk.newestBlock }),
+        ]),
+      );
       const openedAt = Number(opened.timestamp) * 1000;
       return {
         deposited: walk.deposited.toString(),
