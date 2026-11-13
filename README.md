@@ -39,7 +39,9 @@ the browser data was cleared) the totals are worked out from the vault's own `De
 | Market data | The chain only | The chain, the Morpho API and DeFiLlama |
 | How to select | Nothing to set | `NEXT_PUBLIC_VATE_NETWORK=mainnet` |
 
-Testnet gas comes from <https://faucet.testnet.chain.robinhood.com>.
+Testnet gas comes from <https://faucet.testnet.chain.robinhood.com>. The source of the test
+contracts is verified on the testnet explorer, for example the
+[test token](https://explorer.testnet.chain.robinhood.com/address/0xB20105353f68a0877B7e00eED7c07EEcDdf70d03).
 
 ## Run it locally
 
@@ -108,11 +110,12 @@ change needs a new build, and none of them may hold a secret.
 | `pnpm test` | Unit tests (Vitest). No network needed. |
 | `pnpm contracts:test` | Foundry tests of the test contracts. |
 | `pnpm test:integration` | The transaction and history code against a local Anvil fork of the testnet. |
-| `pnpm test:fork` | Read-only checks against a local fork of mainnet. |
+| `pnpm test:fork` | Deposit, withdrawal and MAX with the real vault contracts on a local fork of mainnet. Nothing is sent to the real chain. |
 | `pnpm test:e2e` | The real interface in headless Chromium against a local fork: connect, faucet, deposit, withdraw, portfolio, the share card and more. |
 | `pnpm test:all` | Typecheck, unit, contract and integration tests in one go. |
 | `pnpm qa:screens` | Screenshots of every page at several widths, with checks for console errors, CSP violations and sideways scrolling. Needs a running instance. |
 | `pnpm verify:mappings` | Checks the addresses in the configuration against the live chain and data services. Read-only. |
+| `node scripts/read-position.mjs 0x…` | What the mainnet vaults hold for a wallet: shares, what they are worth, allowance left. Read-only. |
 | `pnpm fork` | The private playground described above. |
 | `pnpm deploy:testnet` | Deploys the test contracts to the testnet (`--check` only reports whether they are there). |
 | `pnpm contracts:build`, `pnpm contracts:export` | Compile the test contracts, then write their addresses, creation code and typed ABIs into `src/`. |
@@ -124,7 +127,8 @@ need Playwright's Chromium: `pnpm exec playwright install chromium`.
 
 ```text
 contracts/           The testnet fixture: test USDG, test vaults, their Foundry tests
-scripts/             e2e run, screenshots, fork playground, deployment, config verification
+docs/                The record of the mainnet acceptance run
+scripts/             e2e run, screenshots, fork playground, deployment, config verification, position read-out
 src/app/             Routes: landing, /app, /docs, /terms, /privacy, /api/market
 src/components/      app/ (vaults, portfolio, transaction panel, share card), landing/, pages/, shared/
 src/config/          Networks, vault allowlists, environment, the testnet fixture addresses
@@ -156,6 +160,9 @@ Foundry.
 The project is a standard Next.js app. On Vercel, import the repository and deploy: with no
 variables set it runs in testnet mode. For mainnet, set `NEXT_PUBLIC_VATE_NETWORK=mainnet` and
 redeploy.
+
+A mainnet launch has to be preceded by a run of the transactions with real funds. Its steps are in
+[`docs/MAINNET_ACCEPTANCE.md`](docs/MAINNET_ACCEPTANCE.md), which also says whether it has been done.
 
 ## More
 
