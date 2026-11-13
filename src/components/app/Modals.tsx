@@ -1,7 +1,9 @@
 'use client';
 
+import { useActiveNetwork } from '@/lib/chain/networkContext';
+
 import { useEffect, useState } from 'react';
-import { explorerTx, NETWORK } from '@/config/networks';
+import { explorerTx } from '@/config/networks';
 import type { WalletOption } from '@/hooks/useWallet';
 import { flowTitle, isBusy, stepStatusLabel, type FlowState, type FlowStep } from '@/lib/tx/machine';
 import { formatAmount, formatGasEth } from '@/lib/units';
@@ -22,6 +24,9 @@ export function WalletModal({
   connecting: boolean;
   error: string | null;
 }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   // The legacy connector exists even without a wallet; only offer it when a provider is injected.
   const [hasInjected, setHasInjected] = useState(false);
   useEffect(() => {
@@ -73,6 +78,9 @@ function stepClass(s: FlowStep): string {
 }
 
 export function TxModal({ open, flow, onClose }: { open: boolean; flow: FlowState; onClose: () => void }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   const busy = isBusy(flow);
   const dep = flow.mode === 'deposit';
   const intro =

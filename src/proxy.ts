@@ -1,8 +1,11 @@
 // Content-Security-Policy with a per-request nonce. Everything the browser may talk to is
 // listed explicitly: this app's own origin, the chain RPC endpoints and (mainnet only) the two
 // read-only data APIs. No analytics, no third-party scripts, no remote fonts.
+//
+// Both mainnet and testnet endpoints are listed so the runtime toggle works without a CSP
+// violation when the user switches networks.
 import { NextResponse, type NextRequest } from 'next/server';
-import { NETWORK } from '@/config/networks';
+import { NETWORKS } from '@/config/networks';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -27,7 +30,12 @@ function frameAncestors(): string {
 }
 
 export function buildCsp(nonce: string, secure: boolean): string {
-  const connect = ["'self'", ...origins(NETWORK.rpcUrls), ...origins(NETWORK.dataHosts)];
+  const connect = [
+    "'self'",
+    ...origins(NETWORKS.mainnet.rpcUrls),
+    ...origins(NETWORKS.testnet.rpcUrls),
+    ...origins(NETWORKS.mainnet.dataHosts),
+  ];
   if (isDev) connect.push('ws:', 'wss:');
   const ancestors = frameAncestors();
   const directives = [

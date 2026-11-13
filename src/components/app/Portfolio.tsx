@@ -1,8 +1,10 @@
 'use client';
 
+import { useActiveNetwork } from '@/lib/chain/networkContext';
+
 import { useState } from 'react';
 import type { Address } from 'viem';
-import { explorerAddress, explorerTx, findVault, NETWORK } from '@/config/networks';
+import { explorerAddress, explorerTx, findVault } from '@/config/networks';
 import { useChainHistory } from '@/hooks/useWallet';
 import type { WalletSnapshot } from '@/lib/chain/reads';
 import { fmtDateTime, fmtPct, fmtUsd, shortAddress } from '@/lib/format';
@@ -14,8 +16,6 @@ import { formatAmount } from '@/lib/units';
 import { ShareCardModal } from './ShareCard';
 import { OrbitIcon, ShareIcon, Unknown } from './ui';
 
-const SYMBOL = NETWORK.asset.symbol;
-const DECIMALS = NETWORK.asset.decimals;
 
 export function PortfolioView({
   account,
@@ -46,6 +46,9 @@ export function PortfolioView({
   onGoVaults: () => void;
   onDismissPending: (hash: PendingRecord['hash']) => void;
 }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   const rows = wallet
     ? ranking.all
         .map((v) => ({ v, state: wallet.vaults[v.market.address.toLowerCase()] }))
@@ -257,6 +260,9 @@ export function PortfolioView({
 
 /** Tracked profit in asset units, to 4 places. Amounts too small to show are neutral, not a red "−0.0000". */
 function ProfitCell({ value }: { value: bigint }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   const abs = value < 0n ? -value : value;
   const text = formatAmount(abs, DECIMALS, 4);
   const exact = `${value < 0n ? '−' : '+'}${formatAmount(abs, DECIMALS, DECIMALS)} ${SYMBOL}`;

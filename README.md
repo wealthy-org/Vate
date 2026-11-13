@@ -7,11 +7,11 @@ straight from the chain, scores each of them by live yield, deposit depth and wi
 liquidity (the *VATE Ranking*), and lets you deposit and withdraw from your own wallet. VATE never
 holds funds: every transaction goes from your wallet to the vault contract.
 
-- Live (testnet mode): <https://vate-ecru.vercel.app>
+- Live: <https://www.vatevault.xyz>
 - X: [@VateVault](https://x.com/VateVault)
 
-> **Status: testnet preview.** The default build runs on Robinhood Chain Testnet with VATE's own
-> test contracts and a test token without value. Terms and Privacy carry a *Draft* banner until the
+> **Status: mainnet interface with a runtime testnet option.** Mainnet uses real assets;
+> testnet uses VATE test contracts and a test token without value. Terms and Privacy carry a *Draft* banner until the
 > operator details are set, and the VATE token shows *Contract pending* until its address is set.
 
 ## What is in it
@@ -31,13 +31,22 @@ the browser data was cleared) the totals are worked out from the vault's own `De
 
 ## Networks
 
+The **Mainnet / Testnet** selector on `/app` changes the network without another site or
+another deployment. It remembers the choice in this browser. `NEXT_PUBLIC_VATE_NETWORK`
+sets the first-visit default (testnet when unset); keep it `mainnet` on the production site.
+Balances, market queries, RPCs, vault allowlists and local activity are isolated by network.
+Switching clears the amount and selected vault. A connected wallet is asked to follow; if it
+refuses, transactions remain blocked by the wrong-network check. Switching is disabled during
+the vault transaction flow. The toggle does not bridge or transfer any funds.
+
+
 | | Testnet (default) | Mainnet |
 | --- | --- | --- |
 | Chain | Robinhood Chain Testnet, id `46630` | Robinhood Chain, id `4663` |
 | Asset | `tUSDG` (VATE Test USDG, 6 decimals), free from the faucet in the app | `USDG` (Global Dollar), `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
 | Vaults | Four VATE test vaults, built from [`contracts/`](contracts) and listed in [`src/config/testnet-fixture.json`](src/config/testnet-fixture.json) | Steakhouse USDG, Galaxy USDG RH Stock Tokens, Yearn Stonk USDG, Purinta USDG, listed in [`src/config/networks.ts`](src/config/networks.ts) |
 | Market data | The chain only | The chain, the Morpho API and DeFiLlama |
-| How to select | Nothing to set | `NEXT_PUBLIC_VATE_NETWORK=mainnet` |
+| How to select | Click Testnet in the app header | Click Mainnet in the app header |
 
 Testnet gas comes from <https://faucet.testnet.chain.robinhood.com>. The source of the test
 contracts is verified on the testnet explorer, for example the

@@ -1,17 +1,18 @@
 'use client';
 
+import { useActiveNetwork } from '@/lib/chain/networkContext';
+
 import { Fragment, useState } from 'react';
 import type { Address } from 'viem';
-import { explorerAddress, findVault, NETWORK } from '@/config/networks';
+import { explorerAddress, findVault } from '@/config/networks';
 import { fmtAge, fmtClock, fmtCompactUsd, fmtDateTime, fmtPct, shortAddress } from '@/lib/format';
 import type { MarketSnapshot, RankedVault, Ranking, VaultOnchain } from '@/lib/types';
 import { hasLiquidityAdapter } from '@/lib/chain/reads';
 import { ApyChart, type ChartRange } from './ApyChart';
 import { StarIcon, Unknown } from './ui';
 
-const SYMBOL = NETWORK.asset.symbol;
 
-export function checkLabel(c: VaultOnchain | null): { text: string; tone: 'ok' | 'bad' | 'wait' } {
+export function checkLabel(c: VaultOnchain | null, SYMBOL = 'USDG'): { text: string; tone: 'ok' | 'bad' | 'wait' } {
   if (!c) return { text: 'checking…', tone: 'wait' };
   if (c.assetCheck === 'verified') return { text: `✓ asset = ${SYMBOL}`, tone: 'ok' };
   if (c.assetCheck === 'pending') return { text: 'pending · chain unreachable', tone: 'wait' };
@@ -41,6 +42,9 @@ export function StatCards({
   blockError: boolean;
   rpcHost: string | null;
 }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   const known = ranking.all.filter((v) => v.market.tvlUsd != null);
   const curated = known.reduce((sum, v) => sum + (v.market.tvlUsd as number), 0);
   const pick = ranking.pick;
@@ -106,6 +110,9 @@ export function VaultList({
   loading: boolean;
   onSelect: (address: Address) => void;
 }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   return (
     <div className="vlist" role="group" aria-label="Vaults">
       {ranking.all.map((v) => {
@@ -165,11 +172,14 @@ export function VaultDetail({
   marketError: boolean;
   now: number;
 }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   const [range, setRange] = useState<ChartRange>(30);
   const [hover, setHover] = useState<0 | 1 | null>(null);
   const m = vault.market;
   const cfg = findVault(NETWORK, m.address);
-  const check = checkLabel(vault.onchain);
+  const check = checkLabel(vault.onchain, SYMBOL);
   const liq = m.liquidityUsd;
   const tvl = m.tvlUsd;
   const liquidityKnown = liq != null && tvl != null;

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PageShell, Section, type TocItem } from '@/components/pages/PageShell';
+import { ActiveNetworkProvider } from '@/lib/chain/networkContext';
 import { TokenChip } from '@/components/shared/TokenChip';
 import { explorerAddress, NETWORK, NETWORKS, type NetworkConfig } from '@/config/networks';
 import { SITE } from '@/config/site';
@@ -255,7 +256,7 @@ export default function DocsPage() {
           </>
         ) : null}
         <h3>VATE token</h3>
-        <TokenChip />
+        <ActiveNetworkProvider><TokenChip /></ActiveNetworkProvider>
         <p className="token-note">
           {SITE.tokenAddress
             ? 'This is the only VATE token contract. Check the address before interacting with it.'

@@ -70,7 +70,10 @@ export async function loadMarket(
   if (network.dataSource === 'onchain-fixture') return loadFixtureSnapshot(client, network);
   if (env.dataMode === 'proxy') {
     try {
-      return parseSnapshot(await fetchJson('/api/market', { signal, timeoutMs: 15_000 }), network);
+      return parseSnapshot(
+        await fetchJson(`/api/market?network=${network.key}`, { signal, timeoutMs: 15_000 }),
+        network,
+      );
     } catch (e) {
       if (signal?.aborted) throw e;
       // The cache route is a convenience. Fall through to the public APIs.

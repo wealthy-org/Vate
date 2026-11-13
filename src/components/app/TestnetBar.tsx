@@ -1,10 +1,10 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { encodeFunctionData, type Address, type Hex } from 'viem';
 import { TEST_USDG_ABI } from '@/abi/testnet.generated';
-import { NETWORK } from '@/config/networks';
+import { useActiveNetwork } from '@/lib/chain/networkContext';
 import { getPublicClient } from '@/lib/chain/client';
 import { FIXTURE, fixtureDeployData, fixtureStatus } from '@/lib/fixture-deploy';
 import { fmtClock } from '@/lib/format';
@@ -29,23 +29,23 @@ export function TestnetBar({
   onSwitch: () => void;
   notify: (text: string, bad?: boolean) => void;
 }) {
-  const queryClient = useQueryClient();
+  const { network } = useActiveNetwork();
   const [working, setWorking] = useState<'faucet' | 'deploy' | null>(null);
   const lock = useRef(false);
 
   const fixture = useQuery({
-    queryKey: ['fixture', NETWORK.key],
-    queryFn: () => fixtureStatus(getPublicClient()),
+    queryKey: ['fixture', network.key],
+    queryFn: () => fixtureStatus(getPublicClient(network)),
     refetchInterval: (q) => (q.state.data === 'deployed' ? false : 20_000),
     staleTime: 10_000,
   });
   const deployed = fixture.data === 'deployed';
 
   const faucet = useQuery({
-    queryKey: ['faucet', NETWORK.key, account?.toLowerCase() ?? 'none'],
+    queryKey: ['faucet', network.key, account?.toLowerCase() ?? 'none'],
     queryFn: async () =>
       Number(
-        await getPublicClient().readContract({
+        await getPublicClient(network).readContract({
           address: FIXTURE.usdg,
           abi: TEST_USDG_ABI,
           functionName: 'faucetAvailableAt',
@@ -64,7 +64,7 @@ export function TestnetBar({
     setWorking(kind);
     try {
       const wallet = await getWalletPort();
-      const publicClient = getPublicClient();
+      const publicClient = getPublicClient(network);
       let to: Address;
       let data: Hex;
       let simulate: () => Promise<unknown>;
@@ -80,11 +80,11 @@ export function TestnetBar({
         simulate = () => publicClient.call({ account, to, data });
       }
       const out = await executePlainCall(
-        { network: NETWORK, publicClient, wallet, account, receiptTimeoutMs: 180_000 },
+        { network, publicClient, wallet, account, receiptTimeoutMs: 180_000 },
         { to, data, simulate },
       );
       if (out.status === 'success') {
-        notify(kind === 'faucet' ? `10,000 ${NETWORK.asset.symbol} claimed` : 'Test contracts deployed');
+        notify(kind === 'faucet' ? `10,000 ${network.asset.symbol} claimed` : 'Test contracts deployed');
       } else if (out.status === 'unknown') {
         notify('Sent, but not confirmed yet. Check your wallet activity before trying again.', true);
       } else {
@@ -95,16 +95,13 @@ export function TestnetBar({
     } finally {
       lock.current = false;
       setWorking(null);
-      for (const key of ['fixture', 'faucet', 'wallet', 'checks', 'market']) {
-        void queryClient.invalidateQueries({ queryKey: [key, NETWORK.key] });
-      }
     }
   }
 
   const walletAction = !account ? (
     <button type="button" onClick={onConnect}>Connect wallet</button>
   ) : !chainOk ? (
-    <button type="button" onClick={onSwitch}>Switch to {NETWORK.shortLabel}</button>
+    <button type="button" onClick={onSwitch}>Switch to {network.shortLabel}</button>
   ) : null;
 
   if (fixture.data && !deployed) {
@@ -112,7 +109,7 @@ export function TestnetBar({
       <div className="notice warn" role="status">
         <span className="tagline">TESTNET</span>
         <span>
-          <b>The VATE test contracts are not on {NETWORK.label} yet.</b> One permissionless transaction creates the test token and four
+          <b>The VATE test contracts are not on {network.label} yet.</b> One permissionless transaction creates the test token and four
           test vaults (≈ 9M gas, ≈ 0.0001 test ETH).
         </span>
         {walletAction ?? (
@@ -120,7 +117,7 @@ export function TestnetBar({
             {working === 'deploy' ? 'Deploying… confirm in wallet' : 'Deploy test contracts'}
           </button>
         )}
-        <a className="pill" href={NETWORK.gasFaucetUrl ?? '#'} target="_blank" rel="noopener noreferrer">Get test ETH ↗</a>
+        <a className="pill" href={network.gasFaucetUrl ?? '#'} target="_blank" rel="noopener noreferrer">Get test ETH ↗</a>
       </div>
     );
   }
@@ -129,17 +126,17 @@ export function TestnetBar({
     <div className="notice" role="note">
       <span className="tagline">TESTNET</span>
       <span>
-        <b>{NETWORK.label}</b> · chain {NETWORK.chain.id} · the vaults and {NETWORK.asset.symbol} are VATE test contracts with no real
+        <b>{network.label}</b> · chain {network.chain.id} · the vaults and {network.asset.symbol} are VATE test contracts with no real
         value{fixture.isError ? ' · could not check deployment' : ''}
       </span>
       {deployed
         ? walletAction ?? (
             <button type="button" disabled={working !== null || cooling} onClick={() => run('faucet')}>
-              {working === 'faucet' ? 'Claiming… confirm in wallet' : cooling ? `Faucet again at ${fmtClock(availableAt).slice(0, 5)}` : `Claim 10,000 ${NETWORK.asset.symbol}`}
+              {working === 'faucet' ? 'Claiming… confirm in wallet' : cooling ? `Faucet again at ${fmtClock(availableAt).slice(0, 5)}` : `Claim 10,000 ${network.asset.symbol}`}
             </button>
           )
         : null}
-      <a className="pill" href={NETWORK.gasFaucetUrl ?? '#'} target="_blank" rel="noopener noreferrer">Get test ETH ↗</a>
+      <a className="pill" href={network.gasFaucetUrl ?? '#'} target="_blank" rel="noopener noreferrer">Get test ETH ↗</a>
     </div>
   );
 }

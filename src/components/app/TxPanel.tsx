@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { NETWORK } from '@/config/networks';
+import { useActiveNetwork } from '@/lib/chain/networkContext';
 import type { WalletSnapshot } from '@/lib/chain/reads';
 import type { FormView } from '@/lib/form';
 import { fmtCompactUsd, fmtPct, fmtUsd } from '@/lib/format';
@@ -9,8 +9,6 @@ import { estimateEarnings } from '@/lib/portfolio';
 import type { RankedVault } from '@/lib/types';
 import { formatAmount, sanitizeAmountInput, toNumber } from '@/lib/units';
 
-const SYMBOL = NETWORK.asset.symbol;
-const DECIMALS = NETWORK.asset.decimals;
 
 export type PanelMode = 'deposit' | 'withdraw';
 
@@ -45,6 +43,9 @@ export function TxPanel({
   onAck: (v: boolean) => void;
   onAction: () => void;
 }) {
+  const { network: NETWORK } = useActiveNetwork();
+  const SYMBOL = NETWORK.asset.symbol;
+  const DECIMALS = NETWORK.asset.decimals;
   const inputId = useId();
   const errId = useId();
   const dep = mode === 'deposit';

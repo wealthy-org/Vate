@@ -1,4 +1,4 @@
-// Network registry. Exactly one network is active per build (NEXT_PUBLIC_VATE_NETWORK).
+// Network registry. NEXT_PUBLIC_VATE_NETWORK sets the default; the app can switch at runtime.
 // Destination contracts come only from this file — never from an API response.
 import { defineChain, getAddress, type Address, type Chain } from 'viem';
 import fixture from './testnet-fixture.json';
@@ -174,7 +174,7 @@ const TESTNET: NetworkConfig = {
 
 export const NETWORKS: Record<NetworkKey, NetworkConfig> = { mainnet: MAINNET, testnet: TESTNET };
 
-/** The network this build talks to. */
+/** Default network for static content and scripts. The app uses useActiveNetwork. */
 export const NETWORK: NetworkConfig = NETWORKS[env.network];
 
 export const TESTNET_FIXTURE = {

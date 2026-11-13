@@ -521,3 +521,11 @@
   .va .va-footer .ca { order: 1; }
   .va .va-footer nav { order: 2; }
 }
+
+/* Runtime network selector; never change chain during an active transaction flow. */
+.net-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--line, #ffffff24);border-radius:9px;background:#ffffff05}
+.net-btn{font:inherit;font-size:11px;padding:7px 9px;border:0;border-radius:6px;background:transparent;color:#91979f;cursor:pointer}
+.net-btn.net-active{background:#d4f878;color:#13180c}
+.net-btn:disabled{opacity:.5;cursor:not-allowed}
+.net-btn:focus-visible{outline:2px solid #d4f878;outline-offset:3px}
+@media(max-width:600px){.va-header{flex-wrap:wrap}.hdr-r{flex-wrap:wrap}.net-btn{padding:6px 8px}}

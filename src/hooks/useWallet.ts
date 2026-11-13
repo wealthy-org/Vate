@@ -4,8 +4,7 @@ import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstac
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { createWalletClient, custom, type Address, type EIP1193Provider } from 'viem';
 import { useConnection, useConnectors, useConnect, useDisconnect, useSwitchChain, type Connector } from 'wagmi';
-import { NETWORK } from '@/config/networks';
-import { REFRESH } from '@/config/site';
+import { useActiveNetwork } from '@/lib/chain/networkContext';
 import { getPublicClient } from '@/lib/chain/client';
 import { readPositionHistory } from '@/lib/chain/history';
 import { readWallet, type WalletSnapshot } from '@/lib/chain/reads';
@@ -26,6 +25,7 @@ function safeIcon(icon: string | undefined): string | null {
 }
 
 export function useWalletConnection() {
+  const { network, key, switchNetwork: contextSwitchNetwork } = useActiveNetwork();
   const connection = useConnection();
   const connectors = useConnectors();
   const connect = useConnect();
@@ -34,7 +34,7 @@ export function useWalletConnection() {
 
   const account: Address | null = connection.status === 'connected' ? connection.address : null;
   const walletChainId = connection.status === 'connected' ? connection.chainId : null;
-  const chainOk = account != null && walletChainId === NETWORK.chain.id;
+  const chainOk = account != null && walletChainId === network.chain.id;
 
   const options = useMemo<WalletOption[]>(() => {
     const announced = connectors.filter((c) => c.id !== 'injected');
@@ -48,17 +48,27 @@ export function useWalletConnection() {
   }, [connectors]);
 
   const switchChain = useCallback(
-    () => switcher.mutateAsync({ chainId: NETWORK.chain.id }),
-    [switcher],
+    () => switcher.mutateAsync({ chainId: network.chain.id }),
+    [switcher, network.chain.id],
   );
+
+  /** Switch to the other network (mainnet <-> testnet) and ask the wallet to follow. */
+  const switchToNetwork = useCallback(async (next: 'mainnet' | 'testnet') => {
+    contextSwitchNetwork(next);
+    try {
+      await switcher.mutateAsync({ chainId: next === 'mainnet' ? 4663 : 46630 });
+    } catch {
+      /* wallet may refuse; the context already recorded the choice */
+    }
+  }, [contextSwitchNetwork, switcher, key]);
 
   const getWalletPort = useCallback(async (): Promise<WalletPort> => {
     if (connection.status !== 'connected') throw new Error('Wallet is not connected.');
     const provider = (await connection.connector.getProvider()) as EIP1193Provider | undefined;
     if (!provider) throw new Error('The wallet provider is not available. Reconnect your wallet.');
-    const client = createWalletClient({ account: connection.address, chain: NETWORK.chain, transport: custom(provider) });
-    return walletPortFromClient(client, NETWORK.chain);
-  }, [connection]);
+    const client = createWalletClient({ account: connection.address, chain: network.chain, transport: custom(provider) });
+    return walletPortFromClient(client, network.chain);
+  }, [connection, network.chain]);
 
   return {
     account,
@@ -73,27 +83,31 @@ export function useWalletConnection() {
     switchChain,
     switching: switcher.isPending,
     getWalletPort,
+    switchToNetwork,
+    activeNetwork: network,
   };
 }
 
 /** Balances, allowances, shares and gates for the connected account. Refreshed every 30 s. */
 export function useWalletData(account: Address | null) {
+  const { network } = useActiveNetwork();
   return useQuery<WalletSnapshot>({
-    queryKey: ['wallet', NETWORK.key, account?.toLowerCase() ?? 'none'],
-    queryFn: () => readWallet(getPublicClient(), NETWORK, account as Address),
+    queryKey: ['wallet', network.key, account?.toLowerCase() ?? 'none'],
+    queryFn: () => readWallet(getPublicClient(network), network, account as Address),
     enabled: account != null,
-    refetchInterval: REFRESH.walletMs,
+    refetchInterval: 30_000,
     staleTime: 5_000,
     placeholderData: (previous, previousQuery) =>
       // Never show another account's numbers while the new account loads.
-      previousQuery?.queryKey[2] === (account?.toLowerCase() ?? 'none') ? keepPreviousData(previous) : undefined,
+      previousQuery?.queryKey[1] === network.key && previousQuery?.queryKey[2] === (account?.toLowerCase() ?? 'none') ? keepPreviousData(previous) : undefined,
   });
 }
 
 /** Local activity, pending transactions and ledgers for the connected account. */
 export function useTxStore(account: Address | null) {
+  const { network } = useActiveNetwork();
   const version = useSyncExternalStore(storageStore.subscribe, storageStore.getSnapshot, storageStore.getServerSnapshot);
-  const store = useMemo(() => (account ? new TxStore(NETWORK.chain.id, account) : null), [account]);
+  const store = useMemo(() => (account ? new TxStore(network.chain.id, account) : null), [account, network.chain.id]);
   return useMemo(
     () => ({
       store,
@@ -112,11 +126,11 @@ export function useTxStore(account: Address | null) {
  * for a position opened here. Returns the vaults still being read.
  */
 export function useChainHistory(account: Address | null, wallet: WalletSnapshot | undefined, store: TxStore | null) {
-  // A ledger adopted below, or a transaction recorded here, changes which positions are left.
+  const { network } = useActiveNetwork();
   const version = useSyncExternalStore(storageStore.subscribe, storageStore.getSnapshot, storageStore.getServerSnapshot);
   const targets = useMemo(() => {
     if (!account || !store || !wallet || wallet.account.toLowerCase() !== account.toLowerCase()) return [];
-    return NETWORK.vaults.flatMap((v) => {
+    return network.vaults.flatMap((v) => {
       const state = wallet.vaults[v.address.toLowerCase()];
       if (!state || state.shares <= 0n) return [];
       const known = trackedProfit(store.ledger(v.address), state.shares, state.assets).status === 'tracked';
@@ -124,14 +138,14 @@ export function useChainHistory(account: Address | null, wallet: WalletSnapshot 
     });
     // `version` is the dependency that matters: the ledgers are read from storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, store, wallet, version]);
+  }, [account, store, wallet, version, network.vaults]);
 
   const results = useQueries({
     queries: targets.map((t) => ({
       // The share balance is part of the key: the same balance has the same history.
-      queryKey: ['history', NETWORK.key, (account as Address).toLowerCase(), t.vault.toLowerCase(), t.shares.toString()],
+      queryKey: ['history', network.key, (account as Address).toLowerCase(), t.vault.toLowerCase(), t.shares.toString()],
       queryFn: async () => {
-        const ledger = await readPositionHistory(getPublicClient(), { vault: t.vault, account: account as Address, shares: t.shares });
+        const ledger = await readPositionHistory(getPublicClient(network), { vault: t.vault, account: account as Address, shares: t.shares });
         if (ledger) (store as TxStore).adoptLedger(t.vault, ledger);
         return ledger != null;
       },
@@ -154,6 +168,7 @@ export function useChainHistory(account: Address | null, wallet: WalletSnapshot 
  */
 export function useReconciler(account: Address | null, onResolved: (items: Reconciled[]) => void) {
   const queryClient = useQueryClient();
+  const { network } = useActiveNetwork();
   const { store, pending } = useTxStore(account);
   const hasPending = pending.length > 0;
   useEffect(() => {
@@ -164,9 +179,9 @@ export function useReconciler(account: Address | null, onResolved: (items: Recon
       if (running || stopped) return;
       running = true;
       try {
-        const done = await reconcilePending({ network: NETWORK, publicClient: getPublicClient(), account, store });
+        const done = await reconcilePending({ network, publicClient: getPublicClient(network), account, store });
         if (!stopped && done.length > 0) {
-          void queryClient.invalidateQueries({ queryKey: ['wallet', NETWORK.key] });
+          void queryClient.invalidateQueries({ queryKey: ['wallet', network.key] });
           onResolved(done);
         }
       } catch {
@@ -183,5 +198,5 @@ export function useReconciler(account: Address | null, onResolved: (items: Recon
     };
     // onResolved is intentionally not a dependency: callers pass a fresh closure each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, store, hasPending, queryClient]);
+  }, [account, store, hasPending, queryClient, network, onResolved]);
 }

@@ -5,15 +5,22 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import type { Address } from 'viem';
 import '@/config/money';
-import { explorerAddress, findVault, NETWORK } from '@/config/networks';
+import { ActiveNetworkProvider, useActiveNetwork } from '@/lib/chain/networkContext';
+import { getPublicClient } from '@/lib/chain/client';
+import { explorerAddress, findVault, type NetworkConfig } from '@/config/networks';
 import { SITE } from '@/config/site';
 import { Mark } from '@/components/shared/Mark';
 import { Providers } from '@/components/shared/Providers';
 import { TokenChip } from '@/components/shared/TokenChip';
 import { XLink } from '@/components/shared/XLink';
 import { useLatestBlock, useRanking, useRpcStatus } from '@/hooks/useMarketData';
-import { useReconciler, useTxStore, useWalletConnection, useWalletData, type WalletOption } from '@/hooks/useWallet';
-import { getPublicClient } from '@/lib/chain/client';
+import {
+  useReconciler,
+  useTxStore,
+  useWalletConnection,
+  useWalletData,
+  type WalletOption,
+} from '@/hooks/useWallet';
 import { evaluateForm } from '@/lib/form';
 import { shortAddress } from '@/lib/format';
 import { readAck, storageStore, writeAck } from '@/lib/storage';
@@ -24,6 +31,7 @@ import type { Reconciled } from '@/lib/tx/reconcile';
 import type { RankedVault } from '@/lib/types';
 import { percentOf, toDecimalString } from '@/lib/units';
 import { TxModal, WalletModal } from './Modals';
+import { NetworkToggle } from './NetworkToggle';
 import { PortfolioView } from './Portfolio';
 import { InsightsFeed, ReasoningPanel } from './Reasoning';
 import { Stars } from './Stars';
@@ -32,20 +40,28 @@ import { TxPanel, type PanelMode } from './TxPanel';
 import { Toast, useNow, useToast } from './ui';
 import { StatCards, VaultDetail, VaultList } from './VaultViews';
 
-const DECIMALS = NETWORK.asset.decimals;
-const SYMBOL = NETWORK.asset.symbol;
 type View = 'vaults' | 'portfolio';
 
 export function VateApp() {
   return (
     <Providers>
-      <AppInner />
+      <ActiveNetworkProvider>
+        <NetworkApp />
+      </ActiveNetworkProvider>
     </Providers>
   );
 }
 
+function NetworkApp() {
+  const { key } = useActiveNetwork();
+  return <AppInner key={key} />;
+}
+
 function AppInner() {
   const queryClient = useQueryClient();
+  const { network, key, switchNetwork } = useActiveNetwork();
+  const DECIMALS = network.asset.decimals;
+  const SYMBOL = network.asset.symbol;
   const data = useRanking();
   const block = useLatestBlock();
   const rpc = useRpcStatus();
@@ -58,7 +74,7 @@ function AppInner() {
   const [flow, dispatch] = useReducer(flowReducer, INITIAL_FLOW);
 
   const [view, setView] = useState<View>('vaults');
-  const [selected, setSelected] = useState<Address>(NETWORK.vaults[0]!.address);
+  const [selected, setSelected] = useState<Address>(network.vaults[0]!.address);
   const [mode, setMode] = useState<PanelMode>('deposit');
   const [amountText, setAmountText] = useState('');
   const [maxWithdraw, setMaxWithdraw] = useState(false);
@@ -118,13 +134,13 @@ function AppInner() {
 
   const refreshChain = useCallback(() => {
     const run = () => {
-      void queryClient.invalidateQueries({ queryKey: ['wallet', NETWORK.key] });
-      void queryClient.invalidateQueries({ queryKey: ['checks', NETWORK.key] });
-      if (NETWORK.dataSource === 'onchain-fixture') void queryClient.invalidateQueries({ queryKey: ['market', NETWORK.key] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet', key] });
+      void queryClient.invalidateQueries({ queryKey: ['checks', key] });
+      if (network.dataSource === 'onchain-fixture') void queryClient.invalidateQueries({ queryKey: ['market', key] });
     };
     run();
     setTimeout(run, 2_500); // a load-balanced RPC can lag a block behind the receipt
-  }, [queryClient]);
+  }, [queryClient, key, network.dataSource]);
 
   useReconciler(account, (items: Reconciled[]) => {
     for (const it of items) {
@@ -133,7 +149,7 @@ function AppInner() {
         continue;
       }
       dispatch({ type: 'RESOLVED', hash: it.hash, outcome: it.outcome, record: it.record });
-      const name = findVault(NETWORK, it.vault)?.name ?? 'vault';
+      const name = findVault(network, it.vault)?.name ?? 'vault';
       if (it.outcome === 'failed') show(`A pending ${it.kind} reverted on-chain. No funds were moved by it.`, true);
       else if (it.kind === 'approve') show('Approval confirmed. You can start the deposit again.');
       else show(`${it.kind === 'deposit' ? 'Deposit into' : 'Withdrawal from'} ${name} confirmed.`);
@@ -145,7 +161,7 @@ function AppInner() {
     () =>
       evaluateForm({
         mode,
-        networkLabel: NETWORK.label,
+        networkLabel: network.label,
         symbol: SYMBOL,
         decimals: DECIMALS,
         vaultName: vault.market.name,
@@ -161,10 +177,10 @@ function AppInner() {
         hasPending: pending.length > 0,
         liquidityUsd: vault.market.liquidityUsd,
       }),
-    [mode, vault, account, chainOk, walletQuery.data, walletQuery.isError, vaultState, amountText, maxWithdraw, ack, flow, pending.length],
+    [mode, vault, account, chainOk, walletQuery.data, walletQuery.isError, vaultState, amountText, maxWithdraw, ack, flow, pending.length, network.label, SYMBOL, DECIMALS],
   );
 
-  const friendly = useCallback((e: unknown) => classifyError(e, errorContext(NETWORK)).message, []);
+  const friendly = useCallback((e: unknown) => classifyError(e, errorContext(network)).message, [network]);
 
   const openWalletModal = useCallback(() => {
     setConnectError(null);
@@ -185,7 +201,7 @@ function AppInner() {
       const result = await wallet.connect(option.connector);
       setWalletModal(false);
       show(`${option.name} connected`);
-      if (result.chainId !== NETWORK.chain.id) void wallet.switchChain().catch(() => {});
+      if (result.chainId !== network.chain.id) void wallet.switchChain().catch(() => {});
     } catch (e) {
       setConnectError(friendly(e));
     }
@@ -193,12 +209,12 @@ function AppInner() {
 
   async function submit() {
     if (submitting.current || !account || !store || form.cta.action !== 'submit' || form.amount == null) return;
-    const cfg = findVault(NETWORK, selected);
+    const cfg = findVault(network, selected);
     if (!cfg) return;
     submitting.current = true; // synchronous guard against a double click
     try {
       const port = await wallet.getWalletPort();
-      const ctx: ExecContext = { network: NETWORK, publicClient: getPublicClient(), wallet: port, account, store, dispatch };
+      const ctx: ExecContext = { network, publicClient: getPublicClient(network), wallet: port, account, store, dispatch };
       setTxModal(true);
       const out =
         mode === 'deposit'
@@ -257,7 +273,7 @@ function AppInner() {
   }, [menuOpen]);
 
   const rpcDown = block.isError || !rpc.ok;
-  const netLabel = rpcDown ? 'RPC offline' : block.data == null ? 'Connecting…' : NETWORK.shortLabel;
+  const netLabel = rpcDown ? 'RPC offline' : block.data == null ? 'Connecting…' : network.shortLabel;
   const issues = data.market?.issues ?? [];
 
   return (
@@ -277,8 +293,14 @@ function AppInner() {
         </nav>
         <div className="hdr-r">
           <Link className="status" href="/docs">Docs ↗</Link>
-          <span className={`status${rpcDown ? ' off' : block.data == null ? ' idle' : ''}`} role="status"><i /><span>{netLabel}</span></span>
+          <span className={`status${rpcDown ? ' off' : block.data == null ? ' idle' : ''}`} role="status">
+            <i /><span>{netLabel}</span>
+          </span>
           <XLink />
+          <NetworkToggle active={key} disabled={isBusy(flow)} onSwitch={(next) => {
+            switchNetwork(next);
+            if (account) void wallet.switchToNetwork(next);
+          }} />
           <button
             ref={walletBtn}
             className="btn wallet"
@@ -299,9 +321,11 @@ function AppInner() {
             <div className="acct-menu" ref={menuRef} role="menu" aria-label="Account">
               <div className="a"><small>{wallet.walletName ?? 'Wallet'}</small>{account}</div>
               {chainOk ? null : (
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void doSwitch(); }}>Switch to {NETWORK.label}</button>
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void doSwitch(); }}>
+                  Switch to {network.label}
+                </button>
               )}
-              <a role="menuitem" href={explorerAddress(NETWORK, account)} target="_blank" rel="noopener noreferrer">View on explorer ↗</a>
+              <a role="menuitem" href={explorerAddress(network, account)} target="_blank" rel="noopener noreferrer">View on explorer ↗</a>
               <button
                 type="button"
                 role="menuitem"
@@ -319,7 +343,7 @@ function AppInner() {
         </div>
       </header>
 
-      {NETWORK.isTestnet ? (
+      {network.isTestnet ? (
         <TestnetBar account={account} chainOk={chainOk} getWalletPort={wallet.getWalletPort} onConnect={openWalletModal} onSwitch={() => void doSwitch()} notify={show} />
       ) : null}
 
@@ -328,9 +352,11 @@ function AppInner() {
           <section className="view" aria-labelledby="vaults-title">
             <div className="hero">
               <div>
-                <h1 className="title" id="vaults-title">Put your <span className="sym">{SYMBOL}</span> <em>in orbit</em></h1>
+                <h1 className="title" id="vaults-title">
+                  Put your <span className="sym">{SYMBOL}</span> <em>in orbit</em>
+                </h1>
                 <p className="sub">
-                  VATE Ranking scores curated {SYMBOL} vaults on {NETWORK.isTestnet ? NETWORK.label : 'Robinhood Chain'} by live yield, depth and
+                  VATE Ranking scores curated {SYMBOL} vaults on {network.isTestnet ? network.label : 'Robinhood Chain'} by live yield, depth and
                   withdrawable liquidity. You pick, you sign, your wallet stays in control.
                 </p>
               </div>

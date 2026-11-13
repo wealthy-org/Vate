@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo, useSyncExternalStore } from 'react';
-import { NETWORK } from '@/config/networks';
+import { useActiveNetwork } from '@/lib/chain/networkContext';
 import { REFRESH } from '@/config/site';
 import { getPublicClient, rpcStatusStore } from '@/lib/chain/client';
 import { readVaultChecks } from '@/lib/chain/reads';
@@ -11,8 +11,8 @@ import { rankVaults } from '@/lib/ranking';
 import type { MarketSnapshot, Ranking, VaultMarket, VaultOnchain } from '@/lib/types';
 
 /** Allowlist entries with every figure unknown: what is shown before or without data. */
-export function placeholderMarkets(): VaultMarket[] {
-  return NETWORK.vaults.map((v) => ({
+export function placeholderMarkets(vaults: readonly { address: `0x${string}`; name: string; curator: string }[]): VaultMarket[] {
+  return vaults.map((v) => ({
     address: v.address,
     name: v.name,
     curator: v.curator,
@@ -33,28 +33,29 @@ export function placeholderMarkets(): VaultMarket[] {
 
 /** Market snapshot, refreshed every 90 s. Previous data stays visible while a refresh runs. */
 export function useMarket() {
+  const { network } = useActiveNetwork();
   return useQuery<MarketSnapshot>({
-    queryKey: ['market', NETWORK.key],
-    queryFn: ({ signal }) => loadMarket(NETWORK, getPublicClient(), signal),
+    queryKey: ['market', network.key],
+    queryFn: ({ signal }) => loadMarket(network, getPublicClient(network), signal),
     refetchInterval: REFRESH.marketMs,
     refetchIntervalInBackground: false,
     staleTime: REFRESH.marketMs / 2,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === network.key ? keepPreviousData(previous) : undefined,
   });
 }
 
 /** On-chain verification of the allowlist, refreshed every 90 s. */
 export function useVaultChecks() {
+  const { network } = useActiveNetwork();
   return useQuery<VaultOnchain[]>({
-    queryKey: ['checks', NETWORK.key],
-    queryFn: () => readVaultChecks(getPublicClient(), NETWORK),
+    queryKey: ['checks', network.key],
+    queryFn: () => readVaultChecks(getPublicClient(network), network),
     refetchInterval: (query) => {
-      // Re-check sooner while something is still pending or the fixture is missing.
       const data = query.state.data;
       return data && data.every((c) => c.assetCheck === 'verified') ? REFRESH.onchainCheckMs : 15_000;
     },
     staleTime: 10_000,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === network.key ? keepPreviousData(previous) : undefined,
   });
 }
 
@@ -72,12 +73,13 @@ export interface RankingState {
 
 /** The single ranking used by the app, the landing HUD and the reasoning panel. */
 export function useRanking(): RankingState {
+  const { network } = useActiveNetwork();
   const market = useMarket();
   const checks = useVaultChecks();
   const ranking = useMemo(() => {
     const map = checks.data ? new Map(checks.data.map((c) => [c.address.toLowerCase(), c])) : null;
-    return rankVaults(market.data?.vaults ?? placeholderMarkets(), map);
-  }, [market.data, checks.data]);
+    return rankVaults(market.data?.vaults ?? placeholderMarkets(network.vaults), map);
+  }, [market.data, checks.data, network.vaults]);
   return {
     ranking,
     market: market.data ?? null,
@@ -94,22 +96,23 @@ export function useRanking(): RankingState {
 
 /** Latest block, polled every 5 s through the failover transport. */
 export function useLatestBlock() {
+  const { network } = useActiveNetwork();
   return useQuery<bigint>({
-    queryKey: ['block', NETWORK.key],
+    queryKey: ['block', network.key],
     queryFn: async () => {
       try {
-        const n = await getPublicClient().getBlockNumber({ cacheTime: 0 });
-        rpcStatusStore.report(true);
+        const n = await getPublicClient(network).getBlockNumber({ cacheTime: 0 });
+        rpcStatusStore.report(true, network.key);
         return n;
       } catch (e) {
-        rpcStatusStore.report(false);
+        rpcStatusStore.report(false, network.key);
         throw e;
       }
     },
     refetchInterval: REFRESH.blockMs,
     retry: 0,
     staleTime: 0,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === network.key ? keepPreviousData(previous) : undefined,
   });
 }
 
