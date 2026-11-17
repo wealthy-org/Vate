@@ -10,3 +10,8 @@ contracts/cache/
 
 # Generated TypeScript modules for the read-only CLI showcase
 .cache/
+
+# Local token deployment artifacts
+contracts/broadcast/
+contracts/VATE-standard-input.json
+scripts/install-vate-token.mjs
