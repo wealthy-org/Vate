@@ -59,7 +59,7 @@ export const env = {
     httpUrl(process.env.NEXT_PUBLIC_RPC_FALLBACK_2),
   ].filter((u): u is string => u !== null),
   /** VATE token. Empty until launch: the widget then shows "Contract pending". */
-  tokenAddress: address(process.env.NEXT_PUBLIC_VATE_TOKEN_ADDRESS),
+  tokenAddress: address(process.env.NEXT_PUBLIC_VATE_TOKEN_ADDRESS || "0x8781ebbe2bd9f0797df5478de670f11f059c816c"),
   termsVersion: text(process.env.NEXT_PUBLIC_TERMS_VERSION, 32) ?? '2026-11-11',
   operatorName: text(process.env.NEXT_PUBLIC_OPERATOR_NAME),
   operatorJurisdiction: text(process.env.NEXT_PUBLIC_OPERATOR_JURISDICTION),
