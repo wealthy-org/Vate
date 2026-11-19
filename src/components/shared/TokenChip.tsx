@@ -1,16 +1,13 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { explorerToken } from '@/config/networks';
-import { useActiveNetwork } from '@/lib/chain/networkContext';
 import { SITE } from '@/config/site';
 
 /**
  * VATE token contract widget. Until a contract address is configured it shows
- * \"Contract pending\" with copy and explorer disabled — never a placeholder address.
+ * \"Contract pending\" with copy disabled — never a placeholder address.
  */
 export function TokenChip({ className }: { className?: string }) {
-  const { network } = useActiveNetwork();
   const address = SITE.tokenAddress;
   const [label, setLabel] = useState('Copy');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,11 +52,6 @@ export function TokenChip({ className }: { className?: string }) {
       >
         {label}
       </button>
-      {address ? (
-        <a className="ca-link" href={explorerToken(network, address)} target="_blank" rel="noopener noreferrer" aria-label="View VATE on the explorer">↗</a>
-      ) : (
-        <span className="ca-link" aria-disabled="true" role="link" aria-label="Explorer link unavailable: the VATE contract is not published yet">↗</span>
-      )}
     </div>
   );
 }
